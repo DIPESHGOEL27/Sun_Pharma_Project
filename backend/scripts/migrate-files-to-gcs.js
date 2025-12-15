@@ -73,9 +73,8 @@ async function uploadToGCS(localPath, destinationPath) {
       },
     });
 
-    // Make file publicly accessible
-    await bucket.file(destinationPath).makePublic();
-
+    // With uniform bucket-level access, we don't need makePublic()
+    // The bucket should have allUsers:objectViewer IAM binding for public access
     const publicUrl = `https://storage.googleapis.com/${BUCKETS.UPLOADS}/${destinationPath}`;
     console.log(`  ✅ Uploaded: ${publicUrl}`);
 

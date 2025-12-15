@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+frontend/dist/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database files
+backend/data/*.db
+*.db
+
+# Uploaded files (keep structure but ignore content)
+backend/uploads/image/*
+backend/uploads/audio/*
+backend/uploads/temp/*
+!backend/uploads/image/.gitkeep
+!backend/uploads/audio/.gitkeep
+!backend/uploads/temp/.gitkeep
+
+# Service account keys (sensitive)
+*-sa-key.json
+service-account*.json
+*credentials*.json
+
+# Logs
+backend/logs/*
+!backend/logs/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+node_modules

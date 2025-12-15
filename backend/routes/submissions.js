@@ -1,0 +1,783 @@
+/**
+ * Submissions Routes
+ * Handles doctor submission CRUD operations
+ */
+
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const { v4: uuidv4 } = require("uuid");
+const { body, param, validationResult } = require("express-validator");
+
+const { getDb } = require("../db/database");
+const logger = require("../utils/logger");
+const {
+  validateImage,
+  validateAudio,
+  validateEmail,
+  validatePhone,
+  normalizePhone,
+  validateLanguageCodes,
+} = require("../utils/validators");
+const {
+  UPLOAD_CONFIG,
+  SUBMISSION_STATUS,
+  MAX_LANGUAGE_SELECTIONS,
+} = require("../utils/constants");
+const googleSheetsService = require("../services/googleSheetsService");
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, "../uploads", file.fieldname);
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${uuidv4()}-${Date.now()}${path.extname(
+      file.originalname
+    )}`;
+    cb(null, uniqueName);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  if (file.fieldname === "image") {
+    if (UPLOAD_CONFIG.IMAGE.allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          `Invalid image format. Allowed: ${UPLOAD_CONFIG.IMAGE.allowedExtensions.join(
+            ", "
+          )}`
+        ),
+        false
+      );
+    }
+  } else if (file.fieldname === "audio") {
+    if (UPLOAD_CONFIG.AUDIO.allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          `Invalid audio format. Allowed: ${UPLOAD_CONFIG.AUDIO.allowedExtensions.join(
+            ", "
+          )}`
+        ),
+        false
+      );
+    }
+  } else {
+    cb(null, true);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: Math.max(
+      UPLOAD_CONFIG.IMAGE.maxSizeBytes,
+      UPLOAD_CONFIG.AUDIO.maxSizeBytes
+    ),
+  },
+});
+
+// Constants for multiple audio upload
+const MAX_AUDIO_FILES = 5;
+const MIN_AUDIO_DURATION_SECONDS = 60; // 1 minute minimum per file
+
+// Validation middleware
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
+
+/**
+ * POST /api/submissions/validate-image
+ * Validate image file before submission
+ */
+router.post("/validate-image", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        isValid: false,
+        errors: ["No image file provided"],
+      });
+    }
+
+    const validation = await validateImage(req.file.path);
+
+    // Clean up the temp file after validation
+    fs.unlinkSync(req.file.path);
+
+    res.json(validation);
+  } catch (error) {
+    logger.error("Image validation error:", error);
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({
+      isValid: false,
+      errors: ["Validation failed: " + error.message],
+    });
+  }
+});
+
+/**
+ * POST /api/submissions/validate-audio
+ * Validate audio file before submission
+ */
+router.post("/validate-audio", upload.single("audio"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        isValid: false,
+        errors: ["No audio file provided"],
+      });
+    }
+
+    const validation = await validateAudio(req.file.path);
+
+    // Clean up the temp file after validation
+    fs.unlinkSync(req.file.path);
+
+    res.json(validation);
+  } catch (error) {
+    logger.error("Audio validation error:", error);
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({
+      isValid: false,
+      errors: ["Validation failed: " + error.message],
+    });
+  }
+});
+
+/**
+ * GET /api/submissions
+ * List all submissions with pagination
+ */
+router.get("/", async (req, res) => {
+  try {
+    const db = getDb();
+    const { page = 1, limit = 20, status, qc_status } = req.query;
+    const offset = (page - 1) * limit;
+
+    let query = `
+      SELECT s.*, d.full_name as doctor_name, d.email as doctor_email, 
+             d.phone as doctor_phone, d.specialty,
+             m.name as mr_name, m.mr_code
+      FROM submissions s
+      LEFT JOIN doctors d ON s.doctor_id = d.id
+      LEFT JOIN medical_reps m ON s.mr_id = m.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (status) {
+      query += " AND s.status = ?";
+      params.push(status);
+    }
+
+    if (qc_status) {
+      query += " AND s.qc_status = ?";
+      params.push(qc_status);
+    }
+
+    query += " ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
+    params.push(parseInt(limit), parseInt(offset));
+
+    const submissions = db.prepare(query).all(...params);
+
+    // Get total count
+    let countQuery = "SELECT COUNT(*) as total FROM submissions WHERE 1=1";
+    const countParams = [];
+    if (status) {
+      countQuery += " AND status = ?";
+      countParams.push(status);
+    }
+    if (qc_status) {
+      countQuery += " AND qc_status = ?";
+      countParams.push(qc_status);
+    }
+    const { total } = db.prepare(countQuery).get(...countParams);
+
+    res.json({
+      submissions: submissions.map((s) => ({
+        ...s,
+        selected_languages: JSON.parse(s.selected_languages || "[]"),
+      })),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching submissions:", error);
+    res.status(500).json({ error: "Failed to fetch submissions" });
+  }
+});
+
+/**
+ * GET /api/submissions/:id
+ * Get single submission details
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+
+    const submission = db
+      .prepare(
+        `
+      SELECT s.*, d.full_name as doctor_name, d.email as doctor_email,
+             d.phone as doctor_phone, d.specialty, d.years_of_practice,
+             d.clinic_name, d.address,
+             m.name as mr_name, m.mr_code, m.phone as mr_phone
+      FROM submissions s
+      LEFT JOIN doctors d ON s.doctor_id = d.id
+      LEFT JOIN medical_reps m ON s.mr_id = m.id
+      WHERE s.id = ?
+    `
+      )
+      .get(id);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    // Get generated audio for this submission
+    const generatedAudio = db
+      .prepare(
+        `
+      SELECT * FROM generated_audio WHERE submission_id = ?
+    `
+      )
+      .all(id);
+
+    // Get generated videos
+    const generatedVideos = db
+      .prepare(
+        `
+      SELECT * FROM generated_videos WHERE submission_id = ?
+    `
+      )
+      .all(id);
+
+    // Get validation results
+    const imageValidation = db
+      .prepare(
+        `
+      SELECT * FROM image_validations WHERE submission_id = ? ORDER BY validated_at DESC LIMIT 1
+    `
+      )
+      .get(id);
+
+    const audioValidation = db
+      .prepare(
+        `
+      SELECT * FROM audio_validations WHERE submission_id = ? ORDER BY validated_at DESC LIMIT 1
+    `
+      )
+      .get(id);
+
+    res.json({
+      ...submission,
+      selected_languages: JSON.parse(submission.selected_languages || "[]"),
+      generated_audio: generatedAudio,
+      generated_videos: generatedVideos,
+      validations: {
+        image: imageValidation,
+        audio: audioValidation,
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching submission:", error);
+    res.status(500).json({ error: "Failed to fetch submission" });
+  }
+});
+
+/**
+ * POST /api/submissions
+ * Create new submission with multiple audio files
+ */
+router.post(
+  "/",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "audio", maxCount: MAX_AUDIO_FILES },
+  ]),
+  [
+    body("doctor_name")
+      .trim()
+      .notEmpty()
+      .withMessage("Doctor name is required"),
+    body("doctor_email").isEmail().withMessage("Valid email is required"),
+    body("doctor_phone").notEmpty().withMessage("Phone number is required"),
+    body("specialty").trim().notEmpty().withMessage("Specialty is required"),
+    body("years_of_practice").optional().isInt({ min: 0 }),
+    body("clinic_name").optional().trim(),
+    body("address").optional().trim(),
+    body("city").optional().trim(),
+    body("state").optional().trim(),
+    body("campaign_name").optional().trim(),
+    body("mr_name").optional().trim(),
+    body("mr_code").optional().trim(),
+    body("mr_phone").optional().trim(),
+    body("selected_languages")
+      .notEmpty()
+      .withMessage("At least one language must be selected"),
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    const db = getDb();
+
+    try {
+      const {
+        doctor_name,
+        doctor_email,
+        doctor_phone,
+        specialty,
+        years_of_practice,
+        clinic_name,
+        address,
+        city,
+        state,
+        campaign_name,
+        mr_name,
+        mr_code,
+        mr_phone,
+        selected_languages,
+      } = req.body;
+
+      // Validate phone
+      if (!validatePhone(doctor_phone)) {
+        return res.status(400).json({ error: "Invalid phone number format" });
+      }
+
+      // Parse and validate languages
+      let languages;
+      try {
+        languages =
+          typeof selected_languages === "string"
+            ? JSON.parse(selected_languages)
+            : selected_languages;
+      } catch (e) {
+        return res
+          .status(400)
+          .json({ error: "Invalid language selection format" });
+      }
+
+      const langValidation = validateLanguageCodes(
+        languages,
+        MAX_LANGUAGE_SELECTIONS
+      );
+      if (!langValidation.isValid) {
+        return res.status(400).json({ errors: langValidation.errors });
+      }
+
+      // Validate uploaded files
+      const imageFile = req.files?.image?.[0];
+      const audioFiles = req.files?.audio || [];
+
+      if (!imageFile) {
+        return res.status(400).json({ error: "Doctor photo is required" });
+      }
+      if (audioFiles.length === 0) {
+        return res
+          .status(400)
+          .json({ error: "At least one voice sample is required" });
+      }
+      if (audioFiles.length > MAX_AUDIO_FILES) {
+        return res
+          .status(400)
+          .json({ error: `Maximum ${MAX_AUDIO_FILES} audio files allowed` });
+      }
+
+      // Validate image
+      const imageValidation = await validateImage(imageFile.path);
+      if (!imageValidation.isValid) {
+        // Clean up uploaded files
+        fs.unlinkSync(imageFile.path);
+        audioFiles.forEach(
+          (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path)
+        );
+        return res.status(400).json({
+          error: "Image validation failed",
+          details: imageValidation,
+        });
+      }
+
+      // Validate all audio files (each must be at least 1 minute)
+      const audioValidations = [];
+      let totalDuration = 0;
+
+      for (const audioFile of audioFiles) {
+        const audioValidation = await validateAudio(audioFile.path);
+        audioValidations.push({
+          filename: audioFile.originalname,
+          path: audioFile.path,
+          ...audioValidation,
+        });
+
+        if (audioValidation.details?.durationSeconds) {
+          totalDuration += audioValidation.details.durationSeconds;
+        }
+
+        // Check minimum duration of 1 minute per file
+        if (
+          audioValidation.details?.durationSeconds < MIN_AUDIO_DURATION_SECONDS
+        ) {
+          // Clean up all files
+          fs.unlinkSync(imageFile.path);
+          audioFiles.forEach(
+            (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path)
+          );
+          return res.status(400).json({
+            error: `Audio file "${audioFile.originalname}" is too short. Minimum 1 minute required.`,
+            details: audioValidation,
+          });
+        }
+
+        if (!audioValidation.isValid) {
+          fs.unlinkSync(imageFile.path);
+          audioFiles.forEach(
+            (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path)
+          );
+          return res.status(400).json({
+            error: `Audio validation failed for "${audioFile.originalname}"`,
+            details: audioValidation,
+          });
+        }
+      }
+
+      // Start transaction
+      const insertDoctor = db.prepare(`
+        INSERT INTO doctors (full_name, email, phone, specialty, years_of_practice, clinic_name, address)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const insertMR = db.prepare(`
+        INSERT OR IGNORE INTO medical_reps (name, mr_code, phone)
+        VALUES (?, ?, ?)
+      `);
+
+      const getMR = db.prepare(`SELECT id FROM medical_reps WHERE mr_code = ?`);
+
+      const insertSubmission = db.prepare(`
+        INSERT INTO submissions (
+          doctor_id, mr_id, image_path, audio_path, 
+          audio_duration_seconds, selected_languages, status,
+          doctor_name, doctor_email, doctor_phone, doctor_specialization,
+          doctor_clinic_name, doctor_city, doctor_state, campaign_name,
+          mr_name, mr_code
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const insertImageValidation = db.prepare(`
+        INSERT INTO image_validations (
+          submission_id, is_valid, has_face, is_front_facing,
+          has_good_lighting, has_plain_background, resolution_ok,
+          no_occlusion, validation_details
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const insertAudioValidation = db.prepare(`
+        INSERT INTO audio_validations (
+          submission_id, is_valid, duration_ok, format_ok,
+          quality_ok, actual_duration_seconds, format_detected,
+          sample_rate, validation_details
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const transaction = db.transaction(() => {
+        // Insert doctor
+        const doctorResult = insertDoctor.run(
+          doctor_name,
+          doctor_email,
+          normalizePhone(doctor_phone),
+          specialty,
+          years_of_practice || null,
+          clinic_name || null,
+          address || null
+        );
+        const doctorId = doctorResult.lastInsertRowid;
+
+        // Insert MR if provided
+        let mrId = null;
+        if (mr_name && mr_code) {
+          insertMR.run(mr_name, mr_code, mr_phone || null);
+          const mr = getMR.get(mr_code);
+          mrId = mr?.id;
+        }
+
+        // Insert submission with doctor/MR info directly
+        const submissionResult = insertSubmission.run(
+          doctorId,
+          mrId,
+          imageFile.path,
+          // Store multiple audio paths as JSON array
+          JSON.stringify(audioFiles.map((f) => f.path)),
+          totalDuration,
+          JSON.stringify(languages),
+          SUBMISSION_STATUS.PENDING_CONSENT,
+          doctor_name,
+          doctor_email,
+          normalizePhone(doctor_phone),
+          specialty,
+          clinic_name || null,
+          city || null,
+          state || null,
+          campaign_name || null,
+          mr_name || null,
+          mr_code || null
+        );
+        const submissionId = submissionResult.lastInsertRowid;
+
+        // Store validation results
+        insertImageValidation.run(
+          submissionId,
+          imageValidation.isValid ? 1 : 0,
+          imageValidation.checks.hasFace ? 1 : 0,
+          imageValidation.checks.frontFacing ? 1 : 0,
+          imageValidation.checks.goodLighting ? 1 : 0,
+          imageValidation.checks.plainBackground ? 1 : 0,
+          imageValidation.checks.resolution ? 1 : 0,
+          imageValidation.checks.noOcclusion ? 1 : 0,
+          JSON.stringify(imageValidation)
+        );
+
+        // Store validation for each audio file
+        for (const av of audioValidations) {
+          insertAudioValidation.run(
+            submissionId,
+            av.isValid ? 1 : 0,
+            av.checks?.duration ? 1 : 0,
+            av.checks?.format ? 1 : 0,
+            av.checks?.sampleRate ? 1 : 0,
+            av.details?.durationSeconds || null,
+            av.details?.format || null,
+            av.details?.sampleRate || null,
+            JSON.stringify(av)
+          );
+        }
+
+        return { submissionId, doctorId };
+      });
+
+      const result = transaction();
+
+      logger.info(
+        `[SUBMISSION] New submission created: ${result.submissionId} with ${audioFiles.length} audio files`
+      );
+
+      // Sync to Google Sheets (async, non-blocking)
+      const submissionData = {
+        id: result.submissionId,
+        created_at: new Date().toISOString(),
+        doctor_name,
+        doctor_email,
+        doctor_phone: normalizePhone(doctor_phone),
+        doctor_specialization: specialty,
+        doctor_clinic_name: clinic_name,
+        doctor_city: city,
+        doctor_state: state,
+        mr_name,
+        mr_code,
+        consent_status: "pending",
+        selected_languages: JSON.stringify(languages),
+        status: SUBMISSION_STATUS.PENDING_CONSENT,
+        image_path: imageFile.path,
+        audio_path: JSON.stringify(audioFiles.map((f) => f.path)),
+      };
+      googleSheetsService.syncSubmission(submissionData).catch((err) => {
+        logger.error(
+          `[SHEETS] Failed to sync submission ${result.submissionId}:`,
+          err
+        );
+      });
+
+      res.status(201).json({
+        message: "Submission created successfully",
+        submission_id: result.submissionId,
+        doctor_id: result.doctorId,
+        status: SUBMISSION_STATUS.PENDING_CONSENT,
+        audio_files_count: audioFiles.length,
+        total_duration_seconds: totalDuration,
+        validations: {
+          image: imageValidation,
+          audio: audioValidations,
+        },
+        next_step: "consent_verification",
+      });
+    } catch (error) {
+      logger.error("Error creating submission:", error);
+      // Clean up files on error
+      if (req.files?.image?.[0]) {
+        fs.unlinkSync(req.files.image[0].path);
+      }
+      // Clean up all audio files
+      if (req.files?.audio) {
+        req.files.audio.forEach((f) => {
+          if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
+        });
+      }
+      res.status(500).json({ error: "Failed to create submission" });
+    }
+  }
+);
+
+/**
+ * PUT /api/submissions/:id
+ * Update submission
+ */
+router.put(
+  "/:id",
+  [param("id").isInt(), body("selected_languages").optional()],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const updates = req.body;
+
+      // Check submission exists
+      const submission = db
+        .prepare("SELECT * FROM submissions WHERE id = ?")
+        .get(id);
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      // Build update query
+      const allowedFields = ["status", "qc_status", "qc_notes"];
+      const updateFields = [];
+      const params = [];
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedFields.includes(key)) {
+          updateFields.push(`${key} = ?`);
+          params.push(value);
+        }
+      }
+
+      if (updates.selected_languages) {
+        const langValidation = validateLanguageCodes(
+          updates.selected_languages,
+          MAX_LANGUAGE_SELECTIONS
+        );
+        if (!langValidation.isValid) {
+          return res.status(400).json({ errors: langValidation.errors });
+        }
+        updateFields.push("selected_languages = ?");
+        params.push(JSON.stringify(updates.selected_languages));
+      }
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      updateFields.push("updated_at = CURRENT_TIMESTAMP");
+      params.push(id);
+
+      db.prepare(
+        `
+        UPDATE submissions SET ${updateFields.join(", ")} WHERE id = ?
+      `
+      ).run(...params);
+
+      res.json({ message: "Submission updated successfully" });
+    } catch (error) {
+      logger.error("Error updating submission:", error);
+      res.status(500).json({ error: "Failed to update submission" });
+    }
+  }
+);
+
+/**
+ * DELETE /api/submissions/:id
+ * Delete submission (soft delete or cleanup)
+ */
+router.delete("/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+
+    const submission = db
+      .prepare("SELECT * FROM submissions WHERE id = ?")
+      .get(id);
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    // Delete associated files
+    if (submission.image_path && fs.existsSync(submission.image_path)) {
+      fs.unlinkSync(submission.image_path);
+    }
+    if (submission.audio_path && fs.existsSync(submission.audio_path)) {
+      fs.unlinkSync(submission.audio_path);
+    }
+
+    // Delete from database (cascade will handle related records)
+    db.prepare("DELETE FROM submissions WHERE id = ?").run(id);
+
+    logger.info(`[SUBMISSION] Deleted submission: ${id}`);
+    res.json({ message: "Submission deleted successfully" });
+  } catch (error) {
+    logger.error("Error deleting submission:", error);
+    res.status(500).json({ error: "Failed to delete submission" });
+  }
+});
+
+/**
+ * GET /api/submissions/stats
+ * Get submission statistics
+ */
+router.get("/stats/overview", async (req, res) => {
+  try {
+    const db = getDb();
+
+    const stats = db
+      .prepare(
+        `
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft,
+        SUM(CASE WHEN status = 'pending_consent' THEN 1 ELSE 0 END) as pending_consent,
+        SUM(CASE WHEN status = 'consent_verified' THEN 1 ELSE 0 END) as consent_verified,
+        SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+        SUM(CASE WHEN status = 'pending_qc' THEN 1 ELSE 0 END) as pending_qc,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN qc_status = 'approved' THEN 1 ELSE 0 END) as qc_approved,
+        SUM(CASE WHEN qc_status = 'rejected' THEN 1 ELSE 0 END) as qc_rejected
+      FROM submissions
+    `
+      )
+      .get();
+
+    res.json(stats);
+  } catch (error) {
+    logger.error("Error fetching stats:", error);
+    res.status(500).json({ error: "Failed to fetch statistics" });
+  }
+});
+
+module.exports = router;

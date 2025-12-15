@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Service account keys (NEVER commit these)
+*-key.json
+*-sa-key.json
+service-account*.json
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+db/*.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Upload directories (keep structure)
+uploads/image/*
+uploads/audio/*
+uploads/video/*
+uploads/audio-masters/*
+!uploads/.gitkeep
+!uploads/image/.gitkeep
+!uploads/audio/.gitkeep
+!uploads/video/.gitkeep
+!uploads/audio-masters/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# Temp files
+tmp/
+temp/
+*.tmp

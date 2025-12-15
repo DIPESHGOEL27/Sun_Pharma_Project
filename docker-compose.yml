@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sunpharma-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET}
+      # ElevenLabs
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      # GCP Configuration
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_KEY_FILE=/app/credentials/gcp-key.json
+      - GCS_BUCKET_UPLOADS=${GCS_BUCKET_UPLOADS}
+      - GCS_BUCKET_AUDIO_MASTERS=${GCS_BUCKET_AUDIO_MASTERS}
+      - GCS_BUCKET_GENERATED_AUDIO=${GCS_BUCKET_GENERATED_AUDIO}
+      - GCS_BUCKET_GENERATED_VIDEO=${GCS_BUCKET_GENERATED_VIDEO}
+      # Email (AWS SES)
+      - AWS_SES_REGION=${AWS_SES_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - SES_FROM_EMAIL=${SES_FROM_EMAIL}
+      # Email (SMTP fallback)
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      # Database
+      - DATABASE_PATH=/app/data/sun_pharma.db
+    volumes:
+      - ./data/uploads:/app/uploads
+      - ./data/db:/app/data
+      - ./credentials:/app/credentials:ro
+      - ./logs:/app/logs
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3001/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sunpharma-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-/api}
+    container_name: sunpharma-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-/api}
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sunpharma-network
+
+networks:
+  sunpharma-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  db-data:

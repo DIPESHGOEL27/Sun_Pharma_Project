@@ -678,9 +678,11 @@ function MetricsTab({ data }) {
                   label={({ name, value }) => `${name}: ${value}`}
                   labelLine={true}
                 >
-                  {statusData.filter((d) => d.value > 0).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
+                  {statusData
+                    .filter((d) => d.value > 0)
+                    .map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -709,9 +711,11 @@ function MetricsTab({ data }) {
                   label={({ name, value }) => `${name}: ${value}`}
                   labelLine={true}
                 >
-                  {qcData.filter((d) => d.value > 0).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
+                  {qcData
+                    .filter((d) => d.value > 0)
+                    .map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
                 </Pie>
                 <Tooltip />
               </PieChart>

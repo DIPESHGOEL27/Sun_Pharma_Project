@@ -27,7 +27,10 @@ async function createTransporter() {
   ) {
     try {
       // Use SESv2 client as required by nodemailer 7.x
-      const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
+      const {
+        SESv2Client,
+        SendEmailCommand,
+      } = require("@aws-sdk/client-sesv2");
 
       const sesClient = new SESv2Client({
         region: process.env.AWS_SES_REGION,
@@ -37,19 +40,21 @@ async function createTransporter() {
         },
       });
 
-      // Import aws module for nodemailer SES transport
-      const aws = require("@aws-sdk/client-sesv2");
-
       logger.info("[EMAIL] Using AWS SES v2 for email delivery", {
         region: process.env.AWS_SES_REGION,
         from: process.env.SES_FROM_EMAIL,
       });
 
+      // Nodemailer 7.x expects { sesClient, SendEmailCommand } format
       return nodemailer.createTransport({
-        SES: { ses: sesClient, aws },
+        SES: { sesClient, SendEmailCommand },
       });
     } catch (error) {
-      logger.error("[EMAIL] AWS SES initialization failed:", error.message, error.stack);
+      logger.error(
+        "[EMAIL] AWS SES initialization failed:",
+        error.message,
+        error.stack
+      );
     }
   }
 

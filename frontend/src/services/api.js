@@ -43,6 +43,9 @@ export const submissionsApi = {
     }),
   // Create submission with files already uploaded to GCS
   createGCS: (data) => api.post("/submissions/gcs", data),
+  // Save final edited video metadata
+  saveFinalVideo: (id, data) =>
+    api.post(`/submissions/${id}/final-video`, data),
   update: (id, data) => api.put(`/submissions/${id}`, data),
   delete: (id) => api.delete(`/submissions/${id}`),
   uploadImage: (id, formData) =>
@@ -174,12 +177,27 @@ export const storageApi = {
   getSubmissionUploadUrls: (doctorPhone, imageFile, audioFiles) =>
     api.post("/storage/submission-upload-urls", {
       doctorPhone,
-      imageFile: imageFile ? { name: imageFile.name, type: imageFile.type } : null,
+      imageFile: imageFile
+        ? { name: imageFile.name, type: imageFile.type }
+        : null,
       audioFiles: audioFiles.map((f) => ({ name: f.name, type: f.type })),
     }),
 
+  // Signed URL for uploading final edited video
+  getFinalVideoUploadUrl: (submissionId, file) =>
+    api.post("/storage/final-video-upload-url", {
+      submissionId,
+      fileName: file.name,
+      fileType: file.type,
+    }),
+
   // Get a single signed upload URL
-  getSignedUploadUrl: (fileName, fileType, bucketType = "UPLOADS", folder = "") =>
+  getSignedUploadUrl: (
+    fileName,
+    fileType,
+    bucketType = "UPLOADS",
+    folder = ""
+  ) =>
     api.post("/storage/signed-upload-url", {
       fileName,
       fileType,
@@ -195,7 +213,7 @@ export const storageApi = {
   uploadToGCS: async (signedUrl, file, onProgress) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      
+
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable && onProgress) {
           const percent = Math.round((event.loaded / event.total) * 100);
@@ -222,17 +240,29 @@ export const storageApi = {
   },
 
   // Upload multiple files to GCS with progress tracking
-  uploadFilesToGCS: async (uploadConfigs, onFileProgress, onOverallProgress) => {
+  uploadFilesToGCS: async (
+    uploadConfigs,
+    onFileProgress,
+    onOverallProgress
+  ) => {
     const results = [];
     let completedFiles = 0;
 
     for (const config of uploadConfigs) {
       try {
-        await storageApi.uploadToGCS(config.uploadUrl, config.file, (percent) => {
-          if (onFileProgress) {
-            onFileProgress(config.index, percent, config.originalName || config.file.name);
+        await storageApi.uploadToGCS(
+          config.uploadUrl,
+          config.file,
+          (percent) => {
+            if (onFileProgress) {
+              onFileProgress(
+                config.index,
+                percent,
+                config.originalName || config.file.name
+              );
+            }
           }
-        });
+        );
 
         results.push({
           success: true,
@@ -245,7 +275,9 @@ export const storageApi = {
 
         completedFiles++;
         if (onOverallProgress) {
-          onOverallProgress(Math.round((completedFiles / uploadConfigs.length) * 100));
+          onOverallProgress(
+            Math.round((completedFiles / uploadConfigs.length) * 100)
+          );
         }
       } catch (error) {
         results.push({

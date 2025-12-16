@@ -442,6 +442,11 @@ async function initDatabase() {
     { name: "image_public_url", type: "TEXT" },
     { name: "submission_prefix", type: "TEXT" },
     { name: "upload_source", type: "TEXT DEFAULT 'local'" },
+    // Final video fields
+    { name: "final_video_gcs_path", type: "TEXT" },
+    { name: "final_video_public_url", type: "TEXT" },
+    { name: "final_video_uploaded_at", type: "DATETIME" },
+    { name: "final_video_uploaded_by", type: "TEXT" },
   ];
 
   for (const col of migrationColumns) {

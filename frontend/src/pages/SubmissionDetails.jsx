@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { submissionsApi, voiceApi, consentApi } from "../services/api";
+import {
+  submissionsApi,
+  voiceApi,
+  consentApi,
+  storageApi,
+  qcApi,
+} from "../services/api";
 import {
   ArrowLeftIcon,
   PhotoIcon,
@@ -21,6 +27,11 @@ export default function SubmissionDetails() {
   const [loading, setLoading] = useState(true);
   const [submission, setSubmission] = useState(null);
   const [actionLoading, setActionLoading] = useState("");
+  const [adminRole] = useState(sessionStorage.getItem("adminRole") || "admin");
+  const [finalVideoFile, setFinalVideoFile] = useState(null);
+  const [finalUploadProgress, setFinalUploadProgress] = useState(0);
+  const [editorAction, setEditorAction] = useState("");
+  const [editorNotes, setEditorNotes] = useState("");
 
   useEffect(() => {
     loadSubmission();
@@ -93,6 +104,90 @@ export default function SubmissionDetails() {
       loadSubmission();
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to delete voice");
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  const handleFinalVideoUpload = async () => {
+    if (!submission?.id) return;
+    if (!finalVideoFile) {
+      toast.error("Please select a final video file");
+      return;
+    }
+
+    setActionLoading("final-upload");
+    try {
+      const { data } = await storageApi.getFinalVideoUploadUrl(
+        submission.id,
+        finalVideoFile
+      );
+
+      await storageApi.uploadToGCS(
+        data.uploadUrl,
+        finalVideoFile,
+        (percent) => {
+          setFinalUploadProgress(percent);
+        }
+      );
+
+      await submissionsApi.saveFinalVideo(submission.id, {
+        gcsPath: data.gcsPath,
+        publicUrl: data.publicUrl,
+        uploadedBy: adminRole,
+        filename: finalVideoFile.name,
+      });
+
+      toast.success("Final video uploaded");
+      setFinalUploadProgress(0);
+      setFinalVideoFile(null);
+      loadSubmission();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || "Failed to upload final video"
+      );
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  const handleEditorAction = async () => {
+    if (!submission?.id) return;
+    if (!editorAction) {
+      toast.error("Select an editor action");
+      return;
+    }
+
+    setActionLoading("editor-action");
+    try {
+      if (editorAction === "approve") {
+        await qcApi.approve(submission.id, adminRole, editorNotes);
+        toast.success("Submission approved");
+      } else if (editorAction === "reupload") {
+        await qcApi.requestChanges(
+          submission.id,
+          adminRole,
+          ["Re-upload final video"],
+          editorNotes || "Re-upload final video"
+        );
+        toast.success("Re-upload requested");
+      } else if (editorAction === "regenerate") {
+        await qcApi.requestChanges(
+          submission.id,
+          adminRole,
+          ["Regenerate final video"],
+          editorNotes || "Regenerate final video"
+        );
+        toast.success("Regeneration requested");
+      }
+
+      setEditorAction("");
+      setEditorNotes("");
+      loadSubmission();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || "Failed to update submission status"
+      );
     } finally {
       setActionLoading("");
     }
@@ -367,9 +462,12 @@ export default function SubmissionDetails() {
                 <PhotoIcon className="w-5 h-5" />
                 Doctor Photo
               </span>
-              {(submission.image_gcs_path || submission.image_path) && (
+              {(submission.image_url ||
+                submission.image_gcs_path ||
+                submission.image_path) && (
                 <a
                   href={
+                    submission.image_url ||
                     submission.image_gcs_path ||
                     `/api/uploads/image/${submission.image_path
                       ?.split("/")
@@ -383,9 +481,12 @@ export default function SubmissionDetails() {
                 </a>
               )}
             </h3>
-            {submission.image_gcs_path || submission.image_path ? (
+            {submission.image_url ||
+            submission.image_gcs_path ||
+            submission.image_path ? (
               <img
                 src={
+                  submission.image_url ||
                   submission.image_gcs_path ||
                   `/api/uploads/image/${submission.image_path
                     ?.split("/")
@@ -415,69 +516,123 @@ export default function SubmissionDetails() {
                 <MicrophoneIcon className="w-5 h-5" />
                 Voice Sample
               </span>
-              {(submission.audio_gcs_path || submission.audio_path) && (
-                <a
-                  href={(() => {
-                    if (submission.audio_gcs_path)
-                      return submission.audio_gcs_path;
-                    const audioPath = submission.audio_path;
-                    if (!audioPath) return "#";
-                    // Handle JSON array format
-                    try {
-                      const parsed = JSON.parse(audioPath);
-                      if (Array.isArray(parsed) && parsed.length > 0) {
-                        return `/api/uploads/audio/${parsed[0]
-                          .split("/")
-                          .pop()}`;
-                      }
-                    } catch (e) {}
-                    return `/api/uploads/audio/${audioPath.split("/").pop()}`;
-                  })()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-sunpharma-blue hover:underline"
-                >
-                  Download
-                </a>
-              )}
-            </h3>
-            {submission.audio_gcs_path || submission.audio_path ? (
-              <div className="space-y-2">
-                <audio controls className="w-full">
-                  <source
-                    src={(() => {
-                      if (submission.audio_gcs_path)
-                        return submission.audio_gcs_path;
-                      const audioPath = submission.audio_path;
-                      if (!audioPath) return "";
-                      // Handle JSON array format
-                      try {
-                        const parsed = JSON.parse(audioPath);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                          return `/api/uploads/audio/${parsed[0]
-                            .split("/")
-                            .pop()}`;
-                        }
-                      } catch (e) {}
-                      return `/api/uploads/audio/${audioPath.split("/").pop()}`;
-                    })()}
-                  />
-                </audio>
-                {submission.audio_duration_seconds && (
-                  <p className="text-sm text-gray-500">
-                    Duration:{" "}
-                    {Math.floor(submission.audio_duration_seconds / 60)}:
-                    {String(
-                      Math.floor(submission.audio_duration_seconds % 60)
-                    ).padStart(2, "0")}
-                  </p>
+              {submission.audio_files?.length > 0 &&
+                submission.audio_files[0].publicUrl && (
+                  <a
+                    href={submission.audio_files[0].publicUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-sunpharma-blue hover:underline"
+                  >
+                    Download
+                  </a>
                 )}
+            </h3>
+            {submission.audio_files?.length > 0 ? (
+              <div className="space-y-3">
+                {submission.audio_files.map((audio, idx) => (
+                  <div
+                    key={audio.gcsPath || audio.publicUrl || idx}
+                    className="space-y-1"
+                  >
+                    <div className="text-sm font-medium text-gray-700">
+                      {audio.filename || `Audio ${idx + 1}`}
+                    </div>
+                    <audio controls className="w-full">
+                      <source src={audio.publicUrl || audio.gcsPath} />
+                    </audio>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
                 No audio uploaded
               </div>
             )}
+          </div>
+
+          {/* Final Video & Editor Actions */}
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <VideoCameraIcon className="w-5 h-5" />
+                Final Video (Editor)
+              </h3>
+              {submission.final_video_url && (
+                <a
+                  href={submission.final_video_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-sunpharma-blue hover:underline"
+                >
+                  View
+                </a>
+              )}
+            </div>
+
+            {submission.final_video_url ? (
+              <p className="text-sm text-gray-600">
+                Final video uploaded. You can replace it by uploading a new file
+                below.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                No final video uploaded yet.
+              </p>
+            )}
+
+            <div className="space-y-2">
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => setFinalVideoFile(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-gray-600"
+              />
+              {finalUploadProgress > 0 && (
+                <div className="text-xs text-gray-500">
+                  Uploading... {finalUploadProgress}%
+                </div>
+              )}
+              <button
+                onClick={handleFinalVideoUpload}
+                disabled={!finalVideoFile || actionLoading === "final-upload"}
+                className="btn-primary w-full justify-center disabled:opacity-50"
+              >
+                {actionLoading === "final-upload"
+                  ? "Uploading..."
+                  : "Upload Final Video"}
+              </button>
+            </div>
+
+            <div className="border-t pt-3 space-y-2">
+              <div className="text-sm font-medium text-gray-700">QC Action</div>
+              <select
+                value={editorAction}
+                onChange={(e) => setEditorAction(e.target.value)}
+                className="input w-full"
+              >
+                <option value="">Select action</option>
+                <option value="approve">Approve</option>
+                <option value="reupload">Re-upload</option>
+                <option value="regenerate">Regenerate</option>
+              </select>
+              <textarea
+                value={editorNotes}
+                onChange={(e) => setEditorNotes(e.target.value)}
+                rows={3}
+                className="w-full p-3 border border-gray-200 rounded-lg text-sm"
+                placeholder="Notes (optional)"
+              />
+              <button
+                onClick={handleEditorAction}
+                disabled={!editorAction || actionLoading === "editor-action"}
+                className="btn-secondary w-full justify-center disabled:opacity-50"
+              >
+                {actionLoading === "editor-action"
+                  ? "Applying..."
+                  : "Apply QC Action"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

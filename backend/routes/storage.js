@@ -11,6 +11,8 @@ const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
 const gcsService = require("../services/gcsService");
+const { getDb } = require("../db/database");
+const { normalizePhone } = require("../utils/validators");
 const logger = require("../utils/logger");
 
 // Configure multer for temporary local storage
@@ -78,7 +80,7 @@ router.post("/submission-upload-urls", async (req, res) => {
 
     // Normalize phone number (remove non-digits, keep last 10 digits)
     const normalizedPhone = doctorPhone.replace(/\D/g, "").slice(-10);
-    
+
     // Generate a unique submission identifier (will be used until actual submission ID is created)
     const timestamp = Date.now();
     const submissionPrefix = `submissions/${normalizedPhone}_${timestamp}`;
@@ -95,11 +97,15 @@ router.post("/submission-upload-urls", async (req, res) => {
     if (imageFile) {
       const ext = path.extname(imageFile.name) || ".jpg";
       const imagePath = `${submissionPrefix}/image_${timestamp}${ext}`;
-      
-      const imageUrl = await gcsService.getSignedUploadUrl("UPLOADS", imagePath, {
-        contentType: imageFile.type || "image/jpeg",
-        expiresInMinutes: 30,
-      });
+
+      const imageUrl = await gcsService.getSignedUploadUrl(
+        "UPLOADS",
+        imagePath,
+        {
+          contentType: imageFile.type || "image/jpeg",
+          expiresInMinutes: 30,
+        }
+      );
 
       result.image = {
         uploadUrl: imageUrl.uploadUrl,
@@ -116,10 +122,14 @@ router.post("/submission-upload-urls", async (req, res) => {
       const ext = path.extname(audioFile.name) || ".mp3";
       const audioPath = `${submissionPrefix}/audio_${i + 1}_${timestamp}${ext}`;
 
-      const audioUrl = await gcsService.getSignedUploadUrl("UPLOADS", audioPath, {
-        contentType: audioFile.type || "audio/mpeg",
-        expiresInMinutes: 30,
-      });
+      const audioUrl = await gcsService.getSignedUploadUrl(
+        "UPLOADS",
+        audioPath,
+        {
+          contentType: audioFile.type || "audio/mpeg",
+          expiresInMinutes: 30,
+        }
+      );
 
       result.audioFiles.push({
         uploadUrl: audioUrl.uploadUrl,
@@ -132,12 +142,82 @@ router.post("/submission-upload-urls", async (req, res) => {
       });
     }
 
-    logger.info(`[STORAGE] Generated upload URLs for submission prefix: ${submissionPrefix}`);
+    logger.info(
+      `[STORAGE] Generated upload URLs for submission prefix: ${submissionPrefix}`
+    );
 
     res.json(result);
   } catch (error) {
     logger.error("[STORAGE] Error generating submission upload URLs:", error);
     res.status(500).json({ error: "Failed to generate upload URLs" });
+  }
+});
+
+/**
+ * POST /api/storage/final-video-upload-url
+ * Get a signed URL for uploading final edited video to GCS
+ */
+router.post("/final-video-upload-url", async (req, res) => {
+  try {
+    const { submissionId, fileName, fileType } = req.body;
+
+    if (!submissionId || !fileName) {
+      return res
+        .status(400)
+        .json({ error: "submissionId and fileName are required" });
+    }
+
+    const db = getDb();
+    const submission = db
+      .prepare(
+        `SELECT id, submission_prefix, doctor_phone FROM submissions WHERE id = ?`
+      )
+      .get(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    const normalizedPhone =
+      normalizePhone(submission.doctor_phone || "") || "unknown";
+    let submissionPrefix =
+      submission.submission_prefix ||
+      `submissions/${normalizedPhone}_${submissionId}`;
+
+    // Persist prefix if it was missing so future uploads remain consistent
+    if (!submission.submission_prefix) {
+      db.prepare(
+        "UPDATE submissions SET submission_prefix = ? WHERE id = ?"
+      ).run(submissionPrefix, submissionId);
+    }
+
+    const ext = path.extname(fileName) || ".mp4";
+    const timestamp = Date.now();
+    const videoPath = `${submissionPrefix}/final_video_${timestamp}${ext}`;
+
+    const uploadConfig = await gcsService.getSignedUploadUrl(
+      "GENERATED_VIDEO",
+      videoPath,
+      {
+        contentType:
+          fileType || gcsService.getMimeType(videoPath) || "video/mp4",
+        expiresInMinutes: 60,
+      }
+    );
+
+    res.json({
+      uploadUrl: uploadConfig.uploadUrl,
+      gcsPath: uploadConfig.gcsPath,
+      publicUrl: `https://storage.googleapis.com/${gcsService.BUCKETS.GENERATED_VIDEO}/${videoPath}`,
+      filePath: videoPath,
+      submissionPrefix,
+      expiresAt: uploadConfig.expiresAt,
+    });
+  } catch (error) {
+    logger.error("[STORAGE] Error generating final video upload URL:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to generate final video upload URL" });
   }
 });
 

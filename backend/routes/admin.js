@@ -835,6 +835,8 @@ router.post("/login", async (req, res) => {
   // Hardcoded admin credentials
   const ADMIN_USERNAME = "ADMIN";
   const ADMIN_PASSWORD = "ADMIN@Sun_Pharma";
+  const EDITOR_USERNAME = "EDITOR";
+  const EDITOR_PASSWORD = "EDITOR@Sun_Pharma";
 
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
     logger.info("[ADMIN] Admin login successful");
@@ -843,10 +845,21 @@ router.post("/login", async (req, res) => {
       message: "Login successful",
       user: { username: "ADMIN", role: "admin" },
     });
-  } else {
-    logger.warn(`[ADMIN] Admin login failed for username: ${username}`);
-    res.status(401).json({ error: "Invalid username or password" });
+    return;
   }
+
+  if (username === EDITOR_USERNAME && password === EDITOR_PASSWORD) {
+    logger.info("[ADMIN] Editor login successful");
+    res.json({
+      success: true,
+      message: "Login successful",
+      user: { username: "EDITOR", role: "editor" },
+    });
+    return;
+  }
+
+  logger.warn(`[ADMIN] Admin login failed for username: ${username}`);
+  res.status(401).json({ error: "Invalid username or password" });
 });
 
 /**

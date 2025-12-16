@@ -325,9 +325,12 @@ function ReviewPanel({
         {/* Image */}
         <div>
           <h4 className="font-medium text-gray-700 mb-2">Photo</h4>
-          {submission.image_path ? (
+          {submission.image_url || submission.image_path ? (
             <img
-              src={`/uploads/image/${submission.image_path.split("/").pop()}`}
+              src={
+                submission.image_url ||
+                `/uploads/image/${submission.image_path.split("/").pop()}`
+              }
               alt="Doctor"
               className="w-full h-48 object-cover rounded-lg bg-gray-100"
               onError={(e) => {
@@ -357,21 +360,18 @@ function ReviewPanel({
         {/* Audio */}
         <div>
           <h4 className="font-medium text-gray-700 mb-2">Voice Sample</h4>
-          {submission.audio_path ? (
-            <div className="space-y-2">
-              <audio controls className="w-full">
-                <source
-                  src={`/uploads/audio/${submission.audio_path
-                    .split("/")
-                    .pop()}`}
-                />
-              </audio>
-              {submission.audio_duration_seconds && (
-                <p className="text-sm text-gray-500">
-                  Duration: {Math.floor(submission.audio_duration_seconds / 60)}
-                  m {Math.floor(submission.audio_duration_seconds % 60)}s
-                </p>
-              )}
+          {submission.audio_files?.length > 0 ? (
+            <div className="space-y-3">
+              {submission.audio_files.map((audio, idx) => (
+                <div key={audio.gcsPath || audio.publicUrl || idx}>
+                  <div className="text-sm text-gray-700 mb-1">
+                    {audio.filename || `Audio ${idx + 1}`}
+                  </div>
+                  <audio controls className="w-full">
+                    <source src={audio.publicUrl || audio.gcsPath} />
+                  </audio>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
@@ -428,6 +428,20 @@ function ReviewPanel({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {submission.final_video_url && (
+        <div className="mb-6">
+          <h4 className="font-medium text-gray-700 mb-2">Final Video</h4>
+          <a
+            href={submission.final_video_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sunpharma-blue hover:underline text-sm"
+          >
+            View final video
+          </a>
         </div>
       )}
 

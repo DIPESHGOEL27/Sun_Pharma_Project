@@ -6,11 +6,65 @@
 const express = require("express");
 const router = express.Router();
 const { body, param, query, validationResult } = require("express-validator");
+const path = require("path");
 
 const { getDb } = require("../db/database");
 const logger = require("../utils/logger");
 const { QC_STATUS, SUBMISSION_STATUS } = require("../utils/constants");
 const googleSheetsService = require("../services/googleSheetsService");
+const gcsService = require("../services/gcsService");
+
+const toPublicUrlFromGcs = (gcsPath) => {
+  if (!gcsPath) return null;
+  if (gcsPath.startsWith("http")) return gcsPath;
+  if (gcsPath.startsWith("gs://")) return gcsService.gsToHttpUrl(gcsPath);
+  return null;
+};
+
+const toLocalUrl = (type, filePath) => {
+  if (!filePath) return null;
+  const filename = filePath.split("/").pop();
+  return `/api/uploads/${type}/${filename}`;
+};
+
+const parseAudioFiles = (audioPath) => {
+  if (!audioPath) return [];
+
+  const mapEntry = (entry, index) => {
+    const gcsPath =
+      entry?.gcsPath ||
+      entry?.gcs_path ||
+      (typeof entry === "string" ? entry : null);
+    const publicUrl =
+      entry?.publicUrl ||
+      entry?.public_url ||
+      toPublicUrlFromGcs(gcsPath) ||
+      toLocalUrl("audio", gcsPath);
+
+    const filename =
+      entry?.filename ||
+      (gcsPath ? path.basename(gcsPath) : `audio_${index + 1}`);
+
+    return {
+      gcsPath,
+      publicUrl,
+      filename,
+    };
+  };
+
+  try {
+    const parsed = JSON.parse(audioPath);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((entry, idx) => mapEntry(entry, idx))
+        .filter((a) => a.gcsPath || a.publicUrl);
+    }
+  } catch (e) {
+    // Not JSON, fall through
+  }
+
+  return [mapEntry(audioPath, 0)];
+};
 
 /**
  * GET /api/qc/pending
@@ -59,10 +113,24 @@ router.get("/pending", async (req, res) => {
       .get();
 
     res.json({
-      submissions: submissions.map((s) => ({
-        ...s,
-        selected_languages: JSON.parse(s.selected_languages || "[]"),
-      })),
+      submissions: submissions.map((s) => {
+        const imageUrl =
+          s.image_public_url ||
+          toPublicUrlFromGcs(s.image_gcs_path) ||
+          toLocalUrl("image", s.image_path);
+        const audioFiles = parseAudioFiles(s.audio_path);
+        const finalVideoUrl =
+          s.final_video_public_url ||
+          toPublicUrlFromGcs(s.final_video_gcs_path);
+
+        return {
+          ...s,
+          image_url: imageUrl,
+          audio_files: audioFiles,
+          final_video_url: finalVideoUrl,
+          selected_languages: JSON.parse(s.selected_languages || "[]"),
+        };
+      }),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -153,8 +221,20 @@ router.get("/submission/:id", async (req, res) => {
       )
       .all(id);
 
+    const imageUrl =
+      submission.image_public_url ||
+      toPublicUrlFromGcs(submission.image_gcs_path) ||
+      toLocalUrl("image", submission.image_path);
+    const audioFiles = parseAudioFiles(submission.audio_path);
+    const finalVideoUrl =
+      submission.final_video_public_url ||
+      toPublicUrlFromGcs(submission.final_video_gcs_path);
+
     res.json({
       ...submission,
+      image_url: imageUrl,
+      audio_files: audioFiles,
+      final_video_url: finalVideoUrl,
       selected_languages: JSON.parse(submission.selected_languages || "[]"),
       validations: {
         image: imageValidation,

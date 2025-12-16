@@ -24,9 +24,11 @@ const {
 const {
   UPLOAD_CONFIG,
   SUBMISSION_STATUS,
+  QC_STATUS,
   MAX_LANGUAGE_SELECTIONS,
 } = require("../utils/constants");
 const googleSheetsService = require("../services/googleSheetsService");
+const gcsService = require("../services/gcsService");
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -60,6 +62,58 @@ const fileFilter = (req, file, cb) => {
       );
     }
   } else if (file.fieldname === "audio") {
+    // Helpers
+    const toPublicUrlFromGcs = (gcsPath) => {
+      if (!gcsPath) return null;
+      if (gcsPath.startsWith("http")) return gcsPath;
+      if (gcsPath.startsWith("gs://")) return gcsService.gsToHttpUrl(gcsPath);
+      return null;
+    };
+
+    const toLocalUrl = (type, filePath) => {
+      if (!filePath) return null;
+      const filename = filePath.split("/").pop();
+      return `/api/uploads/${type}/${filename}`;
+    };
+
+    const parseAudioFiles = (audioPath) => {
+      if (!audioPath) return [];
+
+      const mapEntry = (entry, index) => {
+        const gcsPath =
+          entry?.gcsPath ||
+          entry?.gcs_path ||
+          (typeof entry === "string" ? entry : null);
+        const publicUrl =
+          entry?.publicUrl ||
+          entry?.public_url ||
+          toPublicUrlFromGcs(gcsPath) ||
+          toLocalUrl("audio", gcsPath);
+
+        const filename =
+          entry?.filename ||
+          (gcsPath ? path.basename(gcsPath) : `audio_${index + 1}`);
+
+        return {
+          gcsPath,
+          publicUrl,
+          filename,
+        };
+      };
+
+      try {
+        const parsed = JSON.parse(audioPath);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((entry, idx) => mapEntry(entry, idx))
+            .filter((a) => a.gcsPath || a.publicUrl);
+        }
+      } catch (e) {
+        // Not JSON, treat as single path below
+      }
+
+      return [mapEntry(audioPath, 0)];
+    };
     if (UPLOAD_CONFIG.AUDIO.allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -295,8 +349,22 @@ router.get("/:id", async (req, res) => {
       )
       .get(id);
 
+    const imageUrl =
+      submission.image_public_url ||
+      toPublicUrlFromGcs(submission.image_gcs_path) ||
+      toLocalUrl("image", submission.image_path);
+
+    const audioFiles = parseAudioFiles(submission.audio_path);
+
+    const finalVideoUrl =
+      submission.final_video_public_url ||
+      toPublicUrlFromGcs(submission.final_video_gcs_path);
+
     res.json({
       ...submission,
+      image_url: imageUrl,
+      audio_files: audioFiles,
+      final_video_url: finalVideoUrl,
       selected_languages: JSON.parse(submission.selected_languages || "[]"),
       generated_audio: generatedAudio,
       generated_videos: generatedVideos,
@@ -671,9 +739,7 @@ router.post(
     body("selected_languages")
       .notEmpty()
       .withMessage("At least one language must be selected"),
-    body("image_gcs_path")
-      .notEmpty()
-      .withMessage("Image GCS path is required"),
+    body("image_gcs_path").notEmpty().withMessage("Image GCS path is required"),
     body("image_public_url")
       .notEmpty()
       .withMessage("Image public URL is required"),
@@ -738,10 +804,14 @@ router.post(
 
       // Validate audio paths array
       if (!Array.isArray(audio_gcs_paths) || audio_gcs_paths.length === 0) {
-        return res.status(400).json({ error: "At least one audio file is required" });
+        return res
+          .status(400)
+          .json({ error: "At least one audio file is required" });
       }
       if (audio_gcs_paths.length > MAX_AUDIO_FILES) {
-        return res.status(400).json({ error: `Maximum ${MAX_AUDIO_FILES} audio files allowed` });
+        return res
+          .status(400)
+          .json({ error: `Maximum ${MAX_AUDIO_FILES} audio files allowed` });
       }
 
       // Calculate estimated total duration from audio paths (if provided)
@@ -869,6 +939,82 @@ router.post(
     } catch (error) {
       logger.error("Error creating GCS submission:", error);
       res.status(500).json({ error: "Failed to create submission" });
+    }
+  }
+);
+
+/**
+ * POST /api/submissions/:id/final-video
+ * Register final edited video uploaded via signed URL
+ */
+router.post(
+  "/:id/final-video",
+  [
+    param("id").isInt(),
+    body("gcsPath").notEmpty().withMessage("gcsPath is required"),
+    body("publicUrl").optional().isString(),
+    body("uploadedBy").optional().isString(),
+    body("filename").optional().isString(),
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    const { gcsPath, publicUrl, uploadedBy } = req.body;
+
+    try {
+      const submission = db
+        .prepare("SELECT * FROM submissions WHERE id = ?")
+        .get(id);
+
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      const finalPublicUrl = publicUrl || toPublicUrlFromGcs(gcsPath);
+
+      const newStatus =
+        submission.status === SUBMISSION_STATUS.COMPLETED
+          ? submission.status
+          : SUBMISSION_STATUS.PENDING_QC;
+      const newQcStatus =
+        submission.qc_status === QC_STATUS.APPROVED
+          ? submission.qc_status
+          : QC_STATUS.PENDING;
+
+      db.prepare(
+        `
+        UPDATE submissions 
+        SET final_video_gcs_path = ?,
+            final_video_public_url = ?,
+            final_video_uploaded_at = CURRENT_TIMESTAMP,
+            final_video_uploaded_by = ?,
+            status = ?,
+            qc_status = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+      ).run(
+        gcsPath,
+        finalPublicUrl,
+        uploadedBy || "editor",
+        newStatus,
+        newQcStatus,
+        id
+      );
+
+      logger.info(`[SUBMISSION] Final video attached for submission ${id}`);
+
+      res.json({
+        message: "Final video registered",
+        submission_id: id,
+        final_video_url: finalPublicUrl,
+        status: newStatus,
+        qc_status: newQcStatus,
+      });
+    } catch (error) {
+      logger.error("Error saving final video:", error);
+      res.status(500).json({ error: "Failed to save final video" });
     }
   }
 );

@@ -569,29 +569,39 @@ export default function DoctorSubmission() {
     try {
       // Step 1: Get signed URLs for GCS upload
       toast.loading("Preparing upload...", { id: "upload-prep" });
-      
+
       const urlsResponse = await storageApi.getSubmissionUploadUrls(
         formData.phone,
         imageFile,
         audioFiles
       );
-      
-      const { image: imageUploadConfig, audioFiles: audioUploadConfigs, submissionPrefix } = urlsResponse.data;
+
+      const {
+        image: imageUploadConfig,
+        audioFiles: audioUploadConfigs,
+        submissionPrefix,
+      } = urlsResponse.data;
       toast.dismiss("upload-prep");
 
       // Step 2: Upload image to GCS
       toast.loading("Uploading photo...", { id: "upload-image" });
-      await storageApi.uploadToGCS(imageUploadConfig.uploadUrl, imageFile, (percent) => {
-        // Optional: update progress state here
-      });
+      await storageApi.uploadToGCS(
+        imageUploadConfig.uploadUrl,
+        imageFile,
+        (percent) => {
+          // Optional: update progress state here
+        }
+      );
       toast.dismiss("upload-image");
       toast.success("Photo uploaded successfully", { duration: 2000 });
 
       // Step 3: Upload audio files to GCS
       let audioUploadResults = [];
       if (audioFiles.length > 0) {
-        toast.loading(`Uploading audio files (0/${audioFiles.length})...`, { id: "upload-audio" });
-        
+        toast.loading(`Uploading audio files (0/${audioFiles.length})...`, {
+          id: "upload-audio",
+        });
+
         const uploadConfigs = audioUploadConfigs.map((config, idx) => ({
           ...config,
           file: audioFiles[idx],
@@ -600,7 +610,10 @@ export default function DoctorSubmission() {
         audioUploadResults = await storageApi.uploadFilesToGCS(
           uploadConfigs,
           (index, percent, name) => {
-            toast.loading(`Uploading audio files (${index + 1}/${audioFiles.length})...`, { id: "upload-audio" });
+            toast.loading(
+              `Uploading audio files (${index + 1}/${audioFiles.length})...`,
+              { id: "upload-audio" }
+            );
           },
           (overallPercent) => {
             // Overall progress
@@ -608,9 +621,11 @@ export default function DoctorSubmission() {
         );
 
         toast.dismiss("upload-audio");
-        
+
         if (audioUploadResults.failed > 0) {
-          toast.error(`${audioUploadResults.failed} audio file(s) failed to upload`);
+          toast.error(
+            `${audioUploadResults.failed} audio file(s) failed to upload`
+          );
         } else {
           toast.success("All audio files uploaded", { duration: 2000 });
         }
@@ -618,7 +633,7 @@ export default function DoctorSubmission() {
 
       // Step 4: Create submission with GCS paths
       toast.loading("Creating submission...", { id: "create-submission" });
-      
+
       const submitData = {
         doctor_name: formData.doctorName,
         doctor_email: formData.email,
@@ -637,18 +652,18 @@ export default function DoctorSubmission() {
         image_public_url: imageUploadConfig.publicUrl,
         audio_gcs_paths: audioUploadResults.results
           .filter((r) => r.success)
-          .map((r) => ({ 
-            gcs_path: r.gcsPath, 
+          .map((r) => ({
+            gcs_path: r.gcsPath,
             public_url: r.publicUrl,
             filename: r.filename,
-            duration_seconds: r.durationSeconds || null
+            duration_seconds: r.durationSeconds || null,
           })),
         submission_prefix: submissionPrefix,
       };
 
       // Use createGCS endpoint for GCS uploads
       const res = await submissionsApi.createGCS(submitData);
-      
+
       toast.dismiss("create-submission");
       toast.success("Submission created successfully!", { duration: 3000 });
 

@@ -64,6 +64,9 @@ export default function AdminDashboard() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [userRole, setUserRole] = useState(
+    sessionStorage.getItem("adminRole") || "admin"
+  );
 
   const [activeTab, setActiveTab] = useState("overall"); // overall, mr-grouped, metrics
   const [startDate, setStartDate] = useState("");
@@ -104,6 +107,11 @@ export default function AdminDashboard() {
       if (response.data.success) {
         setIsLoggedIn(true);
         sessionStorage.setItem("adminLoggedIn", "true");
+        setUserRole(response.data.user?.role || "admin");
+        sessionStorage.setItem(
+          "adminRole",
+          response.data.user?.role || "admin"
+        );
       }
     } catch (error) {
       setLoginError(
@@ -117,6 +125,7 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     setIsLoggedIn(false);
     sessionStorage.removeItem("adminLoggedIn");
+    sessionStorage.removeItem("adminRole");
     setUsername("");
     setPassword("");
   };
@@ -239,7 +248,12 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500">Manage and monitor video submissions</p>
+          <p className="text-gray-500 flex items-center gap-2">
+            Manage and monitor video submissions
+            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 uppercase">
+              {userRole}
+            </span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button

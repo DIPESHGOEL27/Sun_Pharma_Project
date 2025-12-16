@@ -64,6 +64,84 @@ router.post("/signed-upload-url", async (req, res) => {
 });
 
 /**
+ * POST /api/storage/submission-upload-urls
+ * Get signed URLs for a doctor submission with structured naming
+ * Naming format: submissions/{doctor_phone}_{submission_id}/{file_type}_{timestamp}.{ext}
+ */
+router.post("/submission-upload-urls", async (req, res) => {
+  try {
+    const { doctorPhone, imageFile, audioFiles = [] } = req.body;
+
+    if (!doctorPhone) {
+      return res.status(400).json({ error: "doctorPhone is required" });
+    }
+
+    // Normalize phone number (remove non-digits, keep last 10 digits)
+    const normalizedPhone = doctorPhone.replace(/\D/g, "").slice(-10);
+    
+    // Generate a unique submission identifier (will be used until actual submission ID is created)
+    const timestamp = Date.now();
+    const submissionPrefix = `submissions/${normalizedPhone}_${timestamp}`;
+
+    const result = {
+      submissionPrefix,
+      phone: normalizedPhone,
+      timestamp,
+      image: null,
+      audioFiles: [],
+    };
+
+    // Generate signed URL for image
+    if (imageFile) {
+      const ext = path.extname(imageFile.name) || ".jpg";
+      const imagePath = `${submissionPrefix}/image_${timestamp}${ext}`;
+      
+      const imageUrl = await gcsService.getSignedUploadUrl("UPLOADS", imagePath, {
+        contentType: imageFile.type || "image/jpeg",
+        expiresInMinutes: 30,
+      });
+
+      result.image = {
+        uploadUrl: imageUrl.uploadUrl,
+        gcsPath: imageUrl.gcsPath,
+        publicUrl: `https://storage.googleapis.com/${gcsService.BUCKETS.UPLOADS}/${imagePath}`,
+        filePath: imagePath,
+        expiresAt: imageUrl.expiresAt,
+      };
+    }
+
+    // Generate signed URLs for audio files
+    for (let i = 0; i < audioFiles.length; i++) {
+      const audioFile = audioFiles[i];
+      const ext = path.extname(audioFile.name) || ".mp3";
+      const audioPath = `${submissionPrefix}/audio_${i + 1}_${timestamp}${ext}`;
+
+      const audioUrl = await gcsService.getSignedUploadUrl("UPLOADS", audioPath, {
+        contentType: audioFile.type || "audio/mpeg",
+        expiresInMinutes: 30,
+      });
+
+      result.audioFiles.push({
+        uploadUrl: audioUrl.uploadUrl,
+        gcsPath: audioUrl.gcsPath,
+        publicUrl: `https://storage.googleapis.com/${gcsService.BUCKETS.UPLOADS}/${audioPath}`,
+        filePath: audioPath,
+        expiresAt: audioUrl.expiresAt,
+        index: i,
+        originalName: audioFile.name,
+      });
+    }
+
+    logger.info(`[STORAGE] Generated upload URLs for submission prefix: ${submissionPrefix}`);
+
+    res.json(result);
+  } catch (error) {
+    logger.error("[STORAGE] Error generating submission upload URLs:", error);
+    res.status(500).json({ error: "Failed to generate upload URLs" });
+  }
+});
+
+/**
  * POST /api/storage/signed-download-url
  * Get a signed URL for downloading a file from GCS
  */

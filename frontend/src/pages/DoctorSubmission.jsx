@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import toast, { Toaster } from "react-hot-toast";
-import { submissionsApi, adminApi } from "../services/api";
+import { submissionsApi, adminApi, storageApi } from "../services/api";
 import {
   PhotoIcon,
   MicrophoneIcon,
@@ -567,42 +567,96 @@ export default function DoctorSubmission() {
     setLoading(true);
 
     try {
-      const submitData = new FormData();
-
-      // Map form fields to backend expected names (snake_case)
-      submitData.append("doctor_name", formData.doctorName);
-      submitData.append("doctor_email", formData.email);
-      submitData.append("doctor_phone", formData.phone);
-      submitData.append("specialty", formData.specialty);
-      submitData.append("clinic_name", formData.clinicName);
-      submitData.append("city", formData.city);
-      submitData.append("state", formData.state);
-      submitData.append("campaign_name", CAMPAIGN_NAME);
-      submitData.append("mr_name", formData.mrName);
-      submitData.append("mr_code", formData.mrCode);
-      submitData.append("mr_phone", formData.mrPhone);
-
-      // Add files
-      submitData.append("image", imageFile);
-      // Add multiple audio files
-      audioFiles.forEach((file) => {
-        submitData.append("audio", file);
-      });
-
-      // Add languages as JSON
-      submitData.append(
-        "selected_languages",
-        JSON.stringify(selectedLanguages)
+      // Step 1: Get signed URLs for GCS upload
+      toast.loading("Preparing upload...", { id: "upload-prep" });
+      
+      const urlsResponse = await storageApi.getSubmissionUploadUrls(
+        formData.phone,
+        imageFile,
+        audioFiles
       );
+      
+      const { image: imageUploadConfig, audioFiles: audioUploadConfigs, submissionPrefix } = urlsResponse.data;
+      toast.dismiss("upload-prep");
 
-      const res = await submissionsApi.create(submitData);
+      // Step 2: Upload image to GCS
+      toast.loading("Uploading photo...", { id: "upload-image" });
+      await storageApi.uploadToGCS(imageUploadConfig.uploadUrl, imageFile, (percent) => {
+        // Optional: update progress state here
+      });
+      toast.dismiss("upload-image");
+      toast.success("Photo uploaded successfully", { duration: 2000 });
 
+      // Step 3: Upload audio files to GCS
+      let audioUploadResults = [];
+      if (audioFiles.length > 0) {
+        toast.loading(`Uploading audio files (0/${audioFiles.length})...`, { id: "upload-audio" });
+        
+        const uploadConfigs = audioUploadConfigs.map((config, idx) => ({
+          ...config,
+          file: audioFiles[idx],
+        }));
+
+        audioUploadResults = await storageApi.uploadFilesToGCS(
+          uploadConfigs,
+          (index, percent, name) => {
+            toast.loading(`Uploading audio files (${index + 1}/${audioFiles.length})...`, { id: "upload-audio" });
+          },
+          (overallPercent) => {
+            // Overall progress
+          }
+        );
+
+        toast.dismiss("upload-audio");
+        
+        if (audioUploadResults.failed > 0) {
+          toast.error(`${audioUploadResults.failed} audio file(s) failed to upload`);
+        } else {
+          toast.success("All audio files uploaded", { duration: 2000 });
+        }
+      }
+
+      // Step 4: Create submission with GCS paths
+      toast.loading("Creating submission...", { id: "create-submission" });
+      
+      const submitData = {
+        doctor_name: formData.doctorName,
+        doctor_email: formData.email,
+        doctor_phone: formData.phone,
+        specialty: formData.specialty,
+        clinic_name: formData.clinicName,
+        city: formData.city,
+        state: formData.state,
+        campaign_name: CAMPAIGN_NAME,
+        mr_name: formData.mrName,
+        mr_code: formData.mrCode,
+        mr_phone: formData.mrPhone,
+        selected_languages: selectedLanguages,
+        // GCS paths
+        image_gcs_path: imageUploadConfig.gcsPath,
+        image_public_url: imageUploadConfig.publicUrl,
+        audio_gcs_paths: audioUploadResults.results
+          .filter((r) => r.success)
+          .map((r) => ({ 
+            gcs_path: r.gcsPath, 
+            public_url: r.publicUrl,
+            filename: r.filename,
+            duration_seconds: r.durationSeconds || null
+          })),
+        submission_prefix: submissionPrefix,
+      };
+
+      // Use createGCS endpoint for GCS uploads
+      const res = await submissionsApi.createGCS(submitData);
+      
+      toast.dismiss("create-submission");
       toast.success("Submission created successfully!", { duration: 3000 });
 
       // Redirect to consent verification
       navigate(`/consent/${res.data.submission_id}`);
     } catch (error) {
       console.error("Submission error:", error);
+      toast.dismiss();
       toast.error(error.response?.data?.error || "Failed to create submission");
     } finally {
       setLoading(false);

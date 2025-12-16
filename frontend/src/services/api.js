@@ -41,6 +41,8 @@ export const submissionsApi = {
     api.post("/submissions", data, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  // Create submission with files already uploaded to GCS
+  createGCS: (data) => api.post("/submissions/gcs", data),
   update: (id, data) => api.put(`/submissions/${id}`, data),
   delete: (id) => api.delete(`/submissions/${id}`),
   uploadImage: (id, formData) =>
@@ -164,6 +166,109 @@ export const adminApi = {
     api.get("/admin/mr-grouped-data", { params }),
   getMetrics: (params = {}) => api.get("/admin/metrics", { params }),
   syncSheets: () => api.post("/admin/sync-sheets"),
+};
+
+// Storage API - GCS Direct Upload
+export const storageApi = {
+  // Get signed URLs for submission files (image + audio)
+  getSubmissionUploadUrls: (doctorPhone, imageFile, audioFiles) =>
+    api.post("/storage/submission-upload-urls", {
+      doctorPhone,
+      imageFile: imageFile ? { name: imageFile.name, type: imageFile.type } : null,
+      audioFiles: audioFiles.map((f) => ({ name: f.name, type: f.type })),
+    }),
+
+  // Get a single signed upload URL
+  getSignedUploadUrl: (fileName, fileType, bucketType = "UPLOADS", folder = "") =>
+    api.post("/storage/signed-upload-url", {
+      fileName,
+      fileType,
+      bucketType,
+      folder,
+    }),
+
+  // Get signed download URL
+  getSignedDownloadUrl: (gcsPath, expiresInMinutes = 60) =>
+    api.post("/storage/signed-download-url", { gcsPath, expiresInMinutes }),
+
+  // Upload file directly to GCS using signed URL
+  uploadToGCS: async (signedUrl, file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ success: true });
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.ontimeout = () => reject(new Error("Upload timed out"));
+
+      xhr.open("PUT", signedUrl, true);
+      xhr.setRequestHeader("Content-Type", file.type);
+      xhr.timeout = 300000; // 5 minutes
+      xhr.send(file);
+    });
+  },
+
+  // Upload multiple files to GCS with progress tracking
+  uploadFilesToGCS: async (uploadConfigs, onFileProgress, onOverallProgress) => {
+    const results = [];
+    let completedFiles = 0;
+
+    for (const config of uploadConfigs) {
+      try {
+        await storageApi.uploadToGCS(config.uploadUrl, config.file, (percent) => {
+          if (onFileProgress) {
+            onFileProgress(config.index, percent, config.originalName || config.file.name);
+          }
+        });
+
+        results.push({
+          success: true,
+          index: config.index,
+          gcsPath: config.gcsPath,
+          publicUrl: config.publicUrl,
+          originalName: config.originalName || config.file.name,
+          filename: config.originalName || config.file.name,
+        });
+
+        completedFiles++;
+        if (onOverallProgress) {
+          onOverallProgress(Math.round((completedFiles / uploadConfigs.length) * 100));
+        }
+      } catch (error) {
+        results.push({
+          success: false,
+          index: config.index,
+          error: error.message,
+          originalName: config.originalName || config.file.name,
+          filename: config.originalName || config.file.name,
+        });
+        completedFiles++;
+      }
+    }
+
+    return {
+      total: uploadConfigs.length,
+      successful: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    };
+  },
+
+  // Get bucket information
+  getBuckets: () => api.get("/storage/buckets"),
 };
 
 export default api;

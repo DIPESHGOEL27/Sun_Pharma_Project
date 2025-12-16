@@ -438,6 +438,10 @@ async function initDatabase() {
     // Doctor address fields
     { name: "doctor_city", type: "TEXT" },
     { name: "doctor_state", type: "TEXT" },
+    // GCS upload fields
+    { name: "image_public_url", type: "TEXT" },
+    { name: "submission_prefix", type: "TEXT" },
+    { name: "upload_source", type: "TEXT DEFAULT 'local'" },
   ];
 
   for (const col of migrationColumns) {

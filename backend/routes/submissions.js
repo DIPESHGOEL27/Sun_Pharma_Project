@@ -645,6 +645,235 @@ router.post(
 );
 
 /**
+ * POST /api/submissions/gcs
+ * Create new submission with files already uploaded to GCS
+ * This endpoint accepts GCS paths instead of file uploads
+ */
+router.post(
+  "/gcs",
+  [
+    body("doctor_name")
+      .trim()
+      .notEmpty()
+      .withMessage("Doctor name is required"),
+    body("doctor_email").isEmail().withMessage("Valid email is required"),
+    body("doctor_phone").notEmpty().withMessage("Phone number is required"),
+    body("specialty").trim().notEmpty().withMessage("Specialty is required"),
+    body("years_of_practice").optional().isInt({ min: 0 }),
+    body("clinic_name").optional().trim(),
+    body("address").optional().trim(),
+    body("city").optional().trim(),
+    body("state").optional().trim(),
+    body("campaign_name").optional().trim(),
+    body("mr_name").optional().trim(),
+    body("mr_code").optional().trim(),
+    body("mr_phone").optional().trim(),
+    body("selected_languages")
+      .notEmpty()
+      .withMessage("At least one language must be selected"),
+    body("image_gcs_path")
+      .notEmpty()
+      .withMessage("Image GCS path is required"),
+    body("image_public_url")
+      .notEmpty()
+      .withMessage("Image public URL is required"),
+    body("audio_gcs_paths")
+      .isArray({ min: 1 })
+      .withMessage("At least one audio GCS path is required"),
+    body("submission_prefix")
+      .notEmpty()
+      .withMessage("Submission prefix is required"),
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    const db = getDb();
+
+    try {
+      const {
+        doctor_name,
+        doctor_email,
+        doctor_phone,
+        specialty,
+        years_of_practice,
+        clinic_name,
+        address,
+        city,
+        state,
+        campaign_name,
+        mr_name,
+        mr_code,
+        mr_phone,
+        selected_languages,
+        image_gcs_path,
+        image_public_url,
+        audio_gcs_paths,
+        submission_prefix,
+      } = req.body;
+
+      // Validate phone
+      if (!validatePhone(doctor_phone)) {
+        return res.status(400).json({ error: "Invalid phone number format" });
+      }
+
+      // Parse and validate languages
+      let languages;
+      try {
+        languages =
+          typeof selected_languages === "string"
+            ? JSON.parse(selected_languages)
+            : selected_languages;
+      } catch (e) {
+        return res
+          .status(400)
+          .json({ error: "Invalid language selection format" });
+      }
+
+      const langValidation = validateLanguageCodes(
+        languages,
+        MAX_LANGUAGE_SELECTIONS
+      );
+      if (!langValidation.isValid) {
+        return res.status(400).json({ errors: langValidation.errors });
+      }
+
+      // Validate audio paths array
+      if (!Array.isArray(audio_gcs_paths) || audio_gcs_paths.length === 0) {
+        return res.status(400).json({ error: "At least one audio file is required" });
+      }
+      if (audio_gcs_paths.length > MAX_AUDIO_FILES) {
+        return res.status(400).json({ error: `Maximum ${MAX_AUDIO_FILES} audio files allowed` });
+      }
+
+      // Calculate estimated total duration from audio paths (if provided)
+      const totalDuration = audio_gcs_paths.reduce((sum, audio) => {
+        return sum + (audio.duration_seconds || 60); // Default 60 seconds if not provided
+      }, 0);
+
+      // Start transaction
+      const insertDoctor = db.prepare(`
+        INSERT INTO doctors (full_name, email, phone, specialty, years_of_practice, clinic_name, address)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const insertMR = db.prepare(`
+        INSERT OR IGNORE INTO medical_reps (name, mr_code, phone)
+        VALUES (?, ?, ?)
+      `);
+
+      const getMR = db.prepare(`SELECT id FROM medical_reps WHERE mr_code = ?`);
+
+      const insertSubmission = db.prepare(`
+        INSERT INTO submissions (
+          doctor_id, mr_id, image_path, audio_path, 
+          audio_duration_seconds, selected_languages, status,
+          doctor_name, doctor_email, doctor_phone, doctor_specialization,
+          doctor_clinic_name, doctor_city, doctor_state, campaign_name,
+          mr_name, mr_code, image_public_url, submission_prefix, upload_source
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const transaction = db.transaction(() => {
+        // Insert doctor
+        const doctorResult = insertDoctor.run(
+          doctor_name,
+          doctor_email,
+          normalizePhone(doctor_phone),
+          specialty,
+          years_of_practice || null,
+          clinic_name || null,
+          address || null
+        );
+        const doctorId = doctorResult.lastInsertRowid;
+
+        // Insert MR if provided
+        let mrId = null;
+        if (mr_name && mr_code) {
+          insertMR.run(mr_name, mr_code, mr_phone || null);
+          const mr = getMR.get(mr_code);
+          mrId = mr?.id;
+        }
+
+        // Insert submission with GCS paths
+        const submissionResult = insertSubmission.run(
+          doctorId,
+          mrId,
+          image_gcs_path, // GCS path for image
+          JSON.stringify(audio_gcs_paths.map((a) => a.gcs_path)), // GCS paths for audio
+          totalDuration,
+          JSON.stringify(languages),
+          SUBMISSION_STATUS.PENDING_CONSENT,
+          doctor_name,
+          doctor_email,
+          normalizePhone(doctor_phone),
+          specialty,
+          clinic_name || null,
+          city || null,
+          state || null,
+          campaign_name || null,
+          mr_name || null,
+          mr_code || null,
+          image_public_url, // Store public URL for easy access
+          submission_prefix, // Store the GCS prefix for this submission
+          "gcs" // Mark this as a GCS upload
+        );
+        const submissionId = submissionResult.lastInsertRowid;
+
+        return { submissionId, doctorId };
+      });
+
+      const result = transaction();
+
+      logger.info(
+        `[SUBMISSION] New GCS submission created: ${result.submissionId} with ${audio_gcs_paths.length} audio files`
+      );
+
+      // Sync to Google Sheets (async, non-blocking)
+      const submissionData = {
+        id: result.submissionId,
+        created_at: new Date().toISOString(),
+        doctor_name,
+        doctor_email,
+        doctor_phone: normalizePhone(doctor_phone),
+        doctor_specialization: specialty,
+        doctor_clinic_name: clinic_name,
+        doctor_city: city,
+        doctor_state: state,
+        mr_name,
+        mr_code,
+        consent_status: "pending",
+        selected_languages: JSON.stringify(languages),
+        status: SUBMISSION_STATUS.PENDING_CONSENT,
+        image_path: image_gcs_path,
+        audio_path: JSON.stringify(audio_gcs_paths.map((a) => a.gcs_path)),
+        upload_source: "gcs",
+      };
+      googleSheetsService.syncSubmission(submissionData).catch((err) => {
+        logger.error(
+          `[SHEETS] Failed to sync GCS submission ${result.submissionId}:`,
+          err
+        );
+      });
+
+      res.status(201).json({
+        message: "Submission created successfully via GCS",
+        submission_id: result.submissionId,
+        doctor_id: result.doctorId,
+        status: SUBMISSION_STATUS.PENDING_CONSENT,
+        audio_files_count: audio_gcs_paths.length,
+        total_duration_seconds: totalDuration,
+        upload_source: "gcs",
+        gcs_prefix: submission_prefix,
+        next_step: "consent_verification",
+      });
+    } catch (error) {
+      logger.error("Error creating GCS submission:", error);
+      res.status(500).json({ error: "Failed to create submission" });
+    }
+  }
+);
+
+/**
  * PUT /api/submissions/:id
  * Update submission
  */

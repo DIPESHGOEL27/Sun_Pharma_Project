@@ -20,9 +20,9 @@ let transporter = null;
  */
 async function createTransporter() {
   // Check if using AWS SES
-  if (process.env.AWS_SES_REGION) {
+  if (process.env.AWS_SES_REGION && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
     try {
-      const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+      const { SESClient } = require("@aws-sdk/client-ses");
 
       const sesClient = new SESClient({
         region: process.env.AWS_SES_REGION,
@@ -35,27 +35,43 @@ async function createTransporter() {
       // Create nodemailer transporter with SES
       const aws = require("@aws-sdk/client-ses");
 
+      logger.info("[EMAIL] Using AWS SES for email delivery", {
+        region: process.env.AWS_SES_REGION,
+        from: process.env.SES_FROM_EMAIL
+      });
+
       return nodemailer.createTransport({
         SES: { ses: sesClient, aws },
       });
     } catch (error) {
-      logger.warn(
-        "AWS SES initialization failed, falling back to SMTP:",
+      logger.error(
+        "[EMAIL] AWS SES initialization failed:",
         error.message
       );
     }
   }
 
-  // Fallback to SMTP
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  // Check if SMTP credentials are configured
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    logger.info("[EMAIL] Using SMTP for email delivery", {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT
+    });
+    
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  // No email configuration - log warning
+  logger.warn("[EMAIL] No email service configured! Set AWS_SES_REGION or SMTP credentials.");
+  return null;
 }
 
 async function getTransporter() {
@@ -66,9 +82,19 @@ async function getTransporter() {
 }
 
 /**
+ * Strip "Dr." prefix from name if already present
+ */
+function stripDrPrefix(name) {
+  if (!name) return name;
+  return name.replace(/^Dr\.?\s*/i, '').trim();
+}
+
+/**
  * Generate OTP verification email HTML
  */
 function generateOTPEmail({ doctorName, otp, expiryMinutes = 15, mrName }) {
+  // Strip Dr. prefix to avoid "Dr. Dr." repetition
+  const cleanName = stripDrPrefix(doctorName);
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -229,7 +255,7 @@ function generateOTPEmail({ doctorName, otp, expiryMinutes = 15, mrName }) {
     </div>
     
     <div class="content">
-      <p class="greeting">Dear Dr. ${doctorName || "Doctor"},</p>
+      <p class="greeting">Dear Dr. ${cleanName || "Doctor"},</p>
       
       <p class="section-title">Purpose of the Video</p>
       <p class="message">
@@ -289,6 +315,8 @@ function generateOTPEmail({ doctorName, otp, expiryMinutes = 15, mrName }) {
  * Generate consent confirmation email HTML
  */
 function generateConsentConfirmedEmail({ doctorName, submissionId }) {
+  // Strip Dr. prefix to avoid "Dr. Dr." repetition
+  const cleanName = stripDrPrefix(doctorName);
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -408,7 +436,7 @@ function generateConsentConfirmedEmail({ doctorName, submissionId }) {
       <p>Consent Confirmation</p>
     </div>
     <div class="content">
-      <p class="greeting">Dear Dr. ${doctorName || "Doctor"},</p>
+      <p class="greeting">Dear Dr. ${cleanName || "Doctor"},</p>
       
       <p class="message">
         We are pleased to confirm that your consent for participation in the Sun Pharma AI Video Platform 
@@ -466,6 +494,11 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
   try {
     const transport = await getTransporter();
 
+    if (!transport) {
+      logger.error(`[EMAIL] No email transport configured. Cannot send OTP to ${doctorEmail}`);
+      throw new Error("Email service not configured. Please contact administrator.");
+    }
+
     const fromEmail =
       process.env.SES_FROM_EMAIL ||
       process.env.SMTP_FROM ||
@@ -483,6 +516,11 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
         mrName,
       }),
     };
+
+    logger.info(`[EMAIL] Attempting to send OTP to ${doctorEmail}`, {
+      from: fromEmail,
+      transport: process.env.AWS_SES_REGION ? 'AWS SES' : 'SMTP'
+    });
 
     const result = await transport.sendMail(mailOptions);
 

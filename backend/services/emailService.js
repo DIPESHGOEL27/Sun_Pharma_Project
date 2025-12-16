@@ -20,11 +20,16 @@ let transporter = null;
  */
 async function createTransporter() {
   // Check if using AWS SES
-  if (process.env.AWS_SES_REGION && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  if (
+    process.env.AWS_SES_REGION &&
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY
+  ) {
     try {
-      const { SESClient } = require("@aws-sdk/client-ses");
+      // Use SESv2 client as required by nodemailer 7.x
+      const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
 
-      const sesClient = new SESClient({
+      const sesClient = new SESv2Client({
         region: process.env.AWS_SES_REGION,
         credentials: {
           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -32,22 +37,19 @@ async function createTransporter() {
         },
       });
 
-      // Create nodemailer transporter with SES
-      const aws = require("@aws-sdk/client-ses");
+      // Import aws module for nodemailer SES transport
+      const aws = require("@aws-sdk/client-sesv2");
 
-      logger.info("[EMAIL] Using AWS SES for email delivery", {
+      logger.info("[EMAIL] Using AWS SES v2 for email delivery", {
         region: process.env.AWS_SES_REGION,
-        from: process.env.SES_FROM_EMAIL
+        from: process.env.SES_FROM_EMAIL,
       });
 
       return nodemailer.createTransport({
         SES: { ses: sesClient, aws },
       });
     } catch (error) {
-      logger.error(
-        "[EMAIL] AWS SES initialization failed:",
-        error.message
-      );
+      logger.error("[EMAIL] AWS SES initialization failed:", error.message, error.stack);
     }
   }
 
@@ -55,9 +57,9 @@ async function createTransporter() {
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     logger.info("[EMAIL] Using SMTP for email delivery", {
       host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT
+      port: process.env.SMTP_PORT,
     });
-    
+
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: parseInt(process.env.SMTP_PORT) || 587,
@@ -70,7 +72,9 @@ async function createTransporter() {
   }
 
   // No email configuration - log warning
-  logger.warn("[EMAIL] No email service configured! Set AWS_SES_REGION or SMTP credentials.");
+  logger.warn(
+    "[EMAIL] No email service configured! Set AWS_SES_REGION or SMTP credentials."
+  );
   return null;
 }
 
@@ -86,7 +90,7 @@ async function getTransporter() {
  */
 function stripDrPrefix(name) {
   if (!name) return name;
-  return name.replace(/^Dr\.?\s*/i, '').trim();
+  return name.replace(/^Dr\.?\s*/i, "").trim();
 }
 
 /**
@@ -495,8 +499,12 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
     const transport = await getTransporter();
 
     if (!transport) {
-      logger.error(`[EMAIL] No email transport configured. Cannot send OTP to ${doctorEmail}`);
-      throw new Error("Email service not configured. Please contact administrator.");
+      logger.error(
+        `[EMAIL] No email transport configured. Cannot send OTP to ${doctorEmail}`
+      );
+      throw new Error(
+        "Email service not configured. Please contact administrator."
+      );
     }
 
     const fromEmail =
@@ -519,7 +527,7 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
 
     logger.info(`[EMAIL] Attempting to send OTP to ${doctorEmail}`, {
       from: fromEmail,
-      transport: process.env.AWS_SES_REGION ? 'AWS SES' : 'SMTP'
+      transport: process.env.AWS_SES_REGION ? "AWS SES" : "SMTP",
     });
 
     const result = await transport.sendMail(mailOptions);

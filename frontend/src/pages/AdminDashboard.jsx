@@ -668,7 +668,7 @@ function MetricsTab({ data }) {
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
-                  data={statusData}
+                  data={statusData.filter((d) => d.value > 0)}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -676,8 +676,9 @@ function MetricsTab({ data }) {
                   paddingAngle={2}
                   dataKey="value"
                   label={({ name, value }) => `${name}: ${value}`}
+                  labelLine={true}
                 >
-                  {statusData.map((entry, index) => (
+                  {statusData.filter((d) => d.value > 0).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
@@ -698,7 +699,7 @@ function MetricsTab({ data }) {
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
-                  data={qcData}
+                  data={qcData.filter((d) => d.value > 0)}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -706,8 +707,9 @@ function MetricsTab({ data }) {
                   paddingAngle={2}
                   dataKey="value"
                   label={({ name, value }) => `${name}: ${value}`}
+                  labelLine={true}
                 >
-                  {qcData.map((entry, index) => (
+                  {qcData.filter((d) => d.value > 0).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>

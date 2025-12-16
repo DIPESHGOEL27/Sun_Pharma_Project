@@ -16,7 +16,7 @@ import {
 // Helper function to strip "Dr." prefix from name if already present
 const stripDrPrefix = (name) => {
   if (!name) return name;
-  return name.replace(/^Dr\.?\s*/i, '').trim();
+  return name.replace(/^Dr\.?\s*/i, "").trim();
 };
 
 export default function ConsentVerification() {
@@ -472,8 +472,9 @@ export default function ConsentVerification() {
               </h2>
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
                 <p className="text-gray-800 mb-4 font-medium">
-                  By providing your consent, you (Dr. {stripDrPrefix(submission?.doctor_name)})
-                  hereby agree to the following:
+                  By providing your consent, you (Dr.{" "}
+                  {stripDrPrefix(submission?.doctor_name)}) hereby agree to the
+                  following:
                 </p>
                 <ol className="space-y-3 text-gray-700">
                   <li className="flex gap-3">
@@ -561,11 +562,11 @@ export default function ConsentVerification() {
                     I Accept All Terms and Conditions
                   </p>
                   <p className="text-sm text-gray-600">
-                    By checking this box, I (Dr. {stripDrPrefix(submission?.doctor_name)})
-                    confirm that I have read, understood, and agree to all the
-                    consent terms mentioned above. I give my full consent to
-                    participate in this AI video generation project for patient
-                    education.
+                    By checking this box, I (Dr.{" "}
+                    {stripDrPrefix(submission?.doctor_name)}) confirm that I
+                    have read, understood, and agree to all the consent terms
+                    mentioned above. I give my full consent to participate in
+                    this AI video generation project for patient education.
                   </p>
                 </div>
               </label>

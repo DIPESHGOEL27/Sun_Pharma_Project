@@ -78,8 +78,16 @@ async function uploadFile(
     let publicUrl = `https://storage.googleapis.com/${BUCKETS[bucketType]}/${destinationPath}`;
 
     // Make file public if requested
+    // Note: This will fail silently if the bucket has uniform bucket-level access enabled
+    // In that case, public access is controlled at the bucket level via IAM
     if (makePublic) {
-      await bucket.file(destinationPath).makePublic();
+      try {
+        await bucket.file(destinationPath).makePublic();
+      } catch (aclError) {
+        // Bucket likely has uniform bucket-level access enabled
+        // Public URL will still work if bucket has allUsers read access via IAM
+        logger.warn(`[GCS] Could not set individual ACL (uniform bucket access?): ${aclError.message}`);
+      }
     }
 
     logger.info(`[GCS] Upload successful: ${gcsPath}`);
@@ -119,7 +127,12 @@ async function uploadBuffer(buffer, bucketType, destinationPath, options = {}) {
     const publicUrl = `https://storage.googleapis.com/${BUCKETS[bucketType]}/${destinationPath}`;
 
     if (makePublic) {
-      await file.makePublic();
+      try {
+        await file.makePublic();
+      } catch (aclError) {
+        // Bucket likely has uniform bucket-level access enabled
+        logger.warn(`[GCS] Could not set individual ACL (uniform bucket access?): ${aclError.message}`);
+      }
     }
 
     logger.info(`[GCS] Buffer upload successful: ${gcsPath}`);

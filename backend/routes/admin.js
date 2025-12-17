@@ -916,6 +916,7 @@ router.get("/overall-data", async (req, res) => {
         .all(sub.id);
       return {
         ...sub,
+        consent_verified: sub.consent_status === "verified",
         videos,
         selected_languages: JSON.parse(sub.selected_languages || "[]"),
       };

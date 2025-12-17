@@ -237,7 +237,7 @@ export default function SubmissionsList() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <Link
-                        to={`/submissions/${sub.id}`}
+                        to={`/admin/submissions/${sub.id}`}
                         className="text-sunpharma-blue hover:text-blue-800 inline-flex items-center gap-1"
                       >
                         <EyeIcon className="w-4 h-4" />

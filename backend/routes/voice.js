@@ -7,12 +7,95 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const { v4: uuidv4 } = require("uuid");
 
 const { getDb } = require("../db/database");
 const logger = require("../utils/logger");
 const elevenLabs = require("../services/elevenlabs");
 const { SUBMISSION_STATUS, VOICE_CLONE_STATUS } = require("../utils/constants");
+const gcsService = require("../services/gcsService");
+
+const TEMP_DIR = path.join(os.tmpdir(), "sunpharma-voice");
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+const buildTempPath = (filename) =>
+  path.join(TEMP_DIR, `${uuidv4()}_${filename || "temp"}`);
+
+const isTempFile = (p) => p && p.startsWith(TEMP_DIR);
+
+const cleanupTempFiles = (paths = []) => {
+  paths.forEach((p) => {
+    if (p && isTempFile(p) && fs.existsSync(p)) {
+      try {
+        fs.unlinkSync(p);
+      } catch (e) {
+        logger.warn(`[VOICE] Failed to clean temp file ${p}: ${e.message}`);
+      }
+    }
+  });
+};
+
+const parseAudioSources = (audioPath) => {
+  if (!audioPath) return [];
+  try {
+    const parsed = JSON.parse(audioPath);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {
+    // not JSON
+  }
+  return [audioPath];
+};
+
+async function downloadHttpToTemp(url) {
+  const fetch = (await import("node-fetch")).default;
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error(`Failed to download file: ${resp.status}`);
+  }
+  const buffer = await resp.buffer();
+  const dest = buildTempPath(path.basename(url.split("?")[0]) || "audio.mp3");
+  fs.writeFileSync(dest, buffer);
+  return dest;
+}
+
+async function ensureLocalFile(sourcePath, bucketType = "UPLOADS") {
+  if (!sourcePath) return null;
+
+  // Already local and exists
+  if (fs.existsSync(sourcePath)) {
+    return sourcePath;
+  }
+
+  // If relative, resolve against project root
+  const absolute = path.isAbsolute(sourcePath)
+    ? sourcePath
+    : path.join(__dirname, "..", sourcePath);
+  if (fs.existsSync(absolute)) {
+    return absolute;
+  }
+
+  // GCS path
+  if (sourcePath.startsWith("gs://")) {
+    const dest = buildTempPath(path.basename(sourcePath));
+    await gcsService.downloadFile(sourcePath, bucketType, dest);
+    return dest;
+  }
+
+  // Public GCS URL
+  if (sourcePath.includes("storage.googleapis.com")) {
+    return downloadHttpToTemp(sourcePath);
+  }
+
+  // Generic HTTP(S)
+  if (sourcePath.startsWith("http")) {
+    return downloadHttpToTemp(sourcePath);
+  }
+
+  throw new Error(`Audio file not found or inaccessible: ${sourcePath}`);
+}
 
 /**
  * POST /api/voice/clone/:submissionId
@@ -39,44 +122,63 @@ router.post("/clone/:submissionId", async (req, res) => {
       return res.status(404).json({ error: "Submission not found" });
     }
 
-    if (!submission.audio_path || !fs.existsSync(submission.audio_path)) {
+    const audioSources = parseAudioSources(submission.audio_path);
+    if (!audioSources.length) {
       return res.status(400).json({ error: "Audio file not found" });
     }
 
-    // Check if already cloned
-    if (
-      submission.elevenlabs_voice_id &&
-      submission.voice_clone_status === VOICE_CLONE_STATUS.COMPLETED
-    ) {
-      return res.status(400).json({
-        error: "Voice already cloned",
-        voice_id: submission.elevenlabs_voice_id,
-      });
-    }
+    const tempFiles = [];
+    const samplePaths = [];
 
-    // Update status to in progress
-    db.prepare(
-      `
+    try {
+      for (const src of audioSources) {
+        const candidate =
+          src?.gcsPath ||
+          src?.gcs_path ||
+          src?.publicUrl ||
+          src?.public_url ||
+          src;
+        const localPath = await ensureLocalFile(candidate, "UPLOADS");
+        samplePaths.push(localPath);
+        if (isTempFile(localPath)) {
+          tempFiles.push(localPath);
+        }
+      }
+
+      // Check if already cloned
+      if (
+        submission.elevenlabs_voice_id &&
+        submission.voice_clone_status === VOICE_CLONE_STATUS.COMPLETED
+      ) {
+        return res.status(400).json({
+          error: "Voice already cloned",
+          voice_id: submission.elevenlabs_voice_id,
+        });
+      }
+
+      // Update status to in progress
+      db.prepare(
+        `
       UPDATE submissions 
       SET voice_clone_status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
     `
-    ).run(VOICE_CLONE_STATUS.IN_PROGRESS, submissionId);
+      ).run(VOICE_CLONE_STATUS.IN_PROGRESS, submissionId);
 
-    // Clone voice
-    const voiceName = `SunPharma_${submission.doctor_name.replace(
-      /\s+/g,
-      "_"
-    )}_${submissionId}`;
-    const result = await elevenLabs.cloneVoice(
-      voiceName,
-      submission.audio_path,
-      `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`
-    );
+      // Clone voice
+      const voiceName = `SunPharma_${submission.doctor_name.replace(
+        /\s+/g,
+        "_"
+      )}_${submissionId}`;
+      const result = await elevenLabs.cloneVoice(
+        voiceName,
+        samplePaths,
+        `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`
+      );
 
-    // Update submission with voice ID
-    db.prepare(
-      `
+      // Update submission with voice ID
+      db.prepare(
+        `
       UPDATE submissions 
       SET elevenlabs_voice_id = ?, 
           voice_clone_status = ?,
@@ -84,35 +186,38 @@ router.post("/clone/:submissionId", async (req, res) => {
           updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
     `
-    ).run(
-      result.voice_id,
-      VOICE_CLONE_STATUS.COMPLETED,
-      SUBMISSION_STATUS.CONSENT_VERIFIED,
-      submissionId
-    );
+      ).run(
+        result.voice_id,
+        VOICE_CLONE_STATUS.COMPLETED,
+        SUBMISSION_STATUS.CONSENT_VERIFIED,
+        submissionId
+      );
 
-    // Log audit
-    db.prepare(
-      `
+      // Log audit
+      db.prepare(
+        `
       INSERT INTO audit_log (entity_type, entity_id, action, details)
       VALUES (?, ?, ?, ?)
     `
-    ).run(
-      "submission",
-      submissionId,
-      "voice_cloned",
-      JSON.stringify({ voice_id: result.voice_id })
-    );
+      ).run(
+        "submission",
+        submissionId,
+        "voice_cloned",
+        JSON.stringify({ voice_id: result.voice_id })
+      );
 
-    logger.info(
-      `[VOICE] Cloned voice for submission ${submissionId}: ${result.voice_id}`
-    );
+      logger.info(
+        `[VOICE] Cloned voice for submission ${submissionId}: ${result.voice_id}`
+      );
 
-    res.json({
-      message: "Voice cloned successfully",
-      voice_id: result.voice_id,
-      submission_id: submissionId,
-    });
+      res.json({
+        message: "Voice cloned successfully",
+        voice_id: result.voice_id,
+        submission_id: submissionId,
+      });
+    } finally {
+      cleanupTempFiles(tempFiles);
+    }
   } catch (error) {
     logger.error(`[VOICE] Clone failed for submission ${submissionId}:`, error);
 
@@ -211,6 +316,7 @@ router.delete("/:submissionId", async (req, res) => {
 router.post("/speech-to-speech/:submissionId", async (req, res) => {
   const db = getDb();
   const { submissionId } = req.params;
+  let tempFiles = [];
 
   try {
     const submission = db
@@ -243,6 +349,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
 
     const results = [];
     const errors = [];
+    const tempFiles = [];
 
     // Process each language
     for (const langCode of selectedLanguages) {
@@ -263,6 +370,13 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
           continue;
         }
 
+        // Ensure master audio is available locally
+        const masterPath = await ensureLocalFile(
+          audioMaster.file_path,
+          "AUDIO_MASTERS"
+        );
+        if (isTempFile(masterPath)) tempFiles.push(masterPath);
+
         // Generate speech-to-speech
         const outputDir = path.join(
           __dirname,
@@ -279,7 +393,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
         // Use streaming for better performance
         await elevenLabs.speechToSpeechStream(
           submission.elevenlabs_voice_id,
-          audioMaster.file_path,
+          masterPath,
           outputPath,
           langCode
         );
@@ -363,6 +477,8 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
       results,
       errors: errors.length > 0 ? errors : undefined,
     });
+
+    cleanupTempFiles(tempFiles);
   } catch (error) {
     logger.error(
       `[VOICE] Speech-to-speech failed for submission ${submissionId}:`,
@@ -375,12 +491,232 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
     `
     ).run(SUBMISSION_STATUS.FAILED, submissionId);
 
+    res.status(500).json({
+      error: "Speech-to-speech generation failed",
+      details: error.message,
+    });
+  } finally {
+    cleanupTempFiles(tempFiles);
+  }
+});
+
+/**
+ * POST /api/voice/process/:submissionId
+ * Clone doctor voice using all uploaded samples, generate speech-to-speech with audio masters,
+ * then delete the cloned voice (one-shot pipeline for admin dashboard)
+ */
+router.post("/process/:submissionId", async (req, res) => {
+  const db = getDb();
+  const { submissionId } = req.params;
+  let tempFiles = [];
+
+  try {
+    const submission = db
+      .prepare(
+        `
+        SELECT s.*, d.full_name as doctor_name
+        FROM submissions s
+        JOIN doctors d ON s.doctor_id = d.id
+        WHERE s.id = ?
+      `
+      )
+      .get(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
+    if (!selectedLanguages.length) {
+      return res.status(400).json({ error: "No languages selected" });
+    }
+
+    const audioSources = parseAudioSources(submission.audio_path);
+    if (!audioSources.length) {
+      return res.status(400).json({ error: "No audio samples available" });
+    }
+
+    const samplePaths = [];
+    for (const src of audioSources) {
+      const candidate =
+        src?.gcsPath ||
+        src?.gcs_path ||
+        src?.publicUrl ||
+        src?.public_url ||
+        src;
+      const localPath = await ensureLocalFile(candidate, "UPLOADS");
+      samplePaths.push(localPath);
+      if (isTempFile(localPath)) tempFiles.push(localPath);
+    }
+
+    // Mark cloning started
+    db.prepare(
+      `
+      UPDATE submissions 
+      SET voice_clone_status = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `
+    ).run(VOICE_CLONE_STATUS.IN_PROGRESS, submissionId);
+
+    const voiceName = `SunPharma_${submission.doctor_name.replace(
+      /\s+/g,
+      "_"
+    )}_${submissionId}`;
+    const cloneResult = await elevenLabs.cloneVoice(
+      voiceName,
+      samplePaths,
+      `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`
+    );
+
+    const voiceId = cloneResult.voice_id;
+
+    db.prepare(
+      `
+      UPDATE submissions 
+      SET elevenlabs_voice_id = ?, voice_clone_status = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `
+    ).run(
+      voiceId,
+      VOICE_CLONE_STATUS.COMPLETED,
+      SUBMISSION_STATUS.CONSENT_VERIFIED,
+      submissionId
+    );
+
+    const results = [];
+    const errors = [];
+
+    for (const langCode of selectedLanguages) {
+      try {
+        const audioMaster = db
+          .prepare(
+            `
+            SELECT * FROM audio_masters 
+            WHERE language_code = ? AND is_active = 1 
+            ORDER BY created_at DESC LIMIT 1
+          `
+          )
+          .get(langCode);
+
+        if (!audioMaster) {
+          errors.push({ language: langCode, error: "No audio master found" });
+          continue;
+        }
+
+        const masterPath = await ensureLocalFile(
+          audioMaster.file_path,
+          "AUDIO_MASTERS"
+        );
+        if (isTempFile(masterPath)) tempFiles.push(masterPath);
+
+        const outputDir = path.join(
+          __dirname,
+          "../uploads/generated_audio",
+          submissionId.toString()
+        );
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        const outputFilename = `${uuidv4()}_${langCode}.mp3`;
+        const outputPath = path.join(outputDir, outputFilename);
+
+        await elevenLabs.speechToSpeechStream(
+          voiceId,
+          masterPath,
+          outputPath,
+          langCode
+        );
+
+        db.prepare(
+          `
+          INSERT INTO generated_audio (
+            submission_id, language_code, audio_master_id,
+            file_path, status
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `
+        ).run(submissionId, langCode, audioMaster.id, outputPath, "completed");
+
+        results.push({
+          language: langCode,
+          status: "completed",
+          file_path: outputPath,
+        });
+      } catch (langError) {
+        errors.push({ language: langCode, error: langError.message });
+        db.prepare(
+          `
+          INSERT INTO generated_audio (
+            submission_id, language_code, status, error_message
+          )
+          VALUES (?, ?, ?, ?)
+        `
+        ).run(submissionId, langCode, "failed", langError.message);
+      }
+    }
+
+    const allCompleted = errors.length === 0;
+    db.prepare(
+      `
+      UPDATE submissions 
+      SET status = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `
+    ).run(
+      allCompleted ? SUBMISSION_STATUS.PENDING_QC : SUBMISSION_STATUS.FAILED,
+      submissionId
+    );
+
+    // Clean up the cloned voice after generation
+    try {
+      await elevenLabs.deleteVoice(voiceId);
+      db.prepare(
+        `
+        UPDATE submissions 
+        SET voice_clone_status = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `
+      ).run(VOICE_CLONE_STATUS.DELETED, submissionId);
+    } catch (deleteErr) {
+      logger.warn(
+        `[VOICE] Failed to delete voice ${voiceId}: ${deleteErr.message}`
+      );
+    }
+
+    res.json({
+      message: allCompleted
+        ? "Voice processed and audio generated"
+        : "Voice processed with partial audio generation",
+      voice_id: voiceId,
+      submission_id: submissionId,
+      results,
+      errors: errors.length ? errors : undefined,
+    });
+  } catch (error) {
+    logger.error(
+      `[VOICE] Process pipeline failed for submission ${submissionId}:`,
+      error
+    );
+
+    db.prepare(
+      `
+      UPDATE submissions 
+      SET voice_clone_status = ?, status = ?, voice_clone_error = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `
+    ).run(
+      VOICE_CLONE_STATUS.FAILED,
+      SUBMISSION_STATUS.FAILED,
+      error.message,
+      submissionId
+    );
+
     res
       .status(500)
-      .json({
-        error: "Speech-to-speech generation failed",
-        details: error.message,
-      });
+      .json({ error: "Voice processing failed", details: error.message });
+  } finally {
+    cleanupTempFiles(tempFiles);
   }
 });
 

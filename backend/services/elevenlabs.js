@@ -59,10 +59,24 @@ async function cloneVoice(name, audioFilePath, description = "") {
 
   const fetch = (await import("node-fetch")).default;
 
+  // Accept single path or array of paths; filter out missing files
+  const sourcePaths = Array.isArray(audioFilePath)
+    ? audioFilePath
+    : [audioFilePath];
+
+  const validPaths = sourcePaths.filter((p) => p && fs.existsSync(p));
+
+  if (validPaths.length === 0) {
+    throw new Error("No valid audio sample files provided for cloning");
+  }
+
   const form = new FormData();
   form.append("name", name);
   form.append("description", description || `Voice clone for ${name}`);
-  form.append("files", fs.createReadStream(audioFilePath));
+
+  validPaths.forEach((p) => {
+    form.append("files", fs.createReadStream(p));
+  });
 
   // Optional: Add labels
   form.append(

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import Layout from "./components/Layout";
 import DoctorSubmission from "./pages/DoctorSubmission";
 import SubmissionsList from "./pages/SubmissionsList";
@@ -15,6 +15,13 @@ function App() {
       <Route path="/" element={<DoctorSubmission />} />
       <Route path="/submit" element={<DoctorSubmission />} />
       <Route path="/consent/:submissionId" element={<ConsentVerification />} />
+
+      {/* Legacy direct submission routes -> redirect to admin namespace */}
+      <Route
+        path="/submissions"
+        element={<Navigate to="/admin/submissions" replace />}
+      />
+      <Route path="/submissions/:id" element={<SubmissionRedirect />} />
 
       {/* Admin Routes with Layout (Internal use) */}
       <Route path="/admin" element={<Layout />}>
@@ -42,6 +49,16 @@ function App() {
         }
       />
     </Routes>
+  );
+}
+
+function SubmissionRedirect() {
+  const { id } = useParams();
+  return (
+    <Navigate
+      to={id ? `/admin/submissions/${id}` : "/admin/submissions"}
+      replace
+    />
   );
 }
 

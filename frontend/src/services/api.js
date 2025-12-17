@@ -73,6 +73,7 @@ export const voiceApi = {
   speechToSpeech: (submissionId) =>
     api.post(`/voice/speech-to-speech/${submissionId}`),
   getStatus: (submissionId) => api.get(`/voice/status/${submissionId}`),
+  process: (submissionId) => api.post(`/voice/process/${submissionId}`),
 };
 
 // Audio Masters API

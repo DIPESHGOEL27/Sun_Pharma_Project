@@ -31,6 +31,58 @@ const googleSheetsService = require("../services/googleSheetsService");
 const gcsService = require("../services/gcsService");
 
 // Configure multer for file uploads
+const toPublicUrlFromGcs = (gcsPath) => {
+  if (!gcsPath) return null;
+  if (gcsPath.startsWith("http")) return gcsPath;
+  if (gcsPath.startsWith("gs://")) return gcsService.gsToHttpUrl(gcsPath);
+  return null;
+};
+
+const toLocalUrl = (type, filePath) => {
+  if (!filePath) return null;
+  const filename = filePath.split("/").pop();
+  return `/api/uploads/${type}/${filename}`;
+};
+
+const parseAudioFiles = (audioPath) => {
+  if (!audioPath) return [];
+
+  const mapEntry = (entry, index) => {
+    const gcsPath =
+      entry?.gcsPath ||
+      entry?.gcs_path ||
+      (typeof entry === "string" ? entry : null);
+    const publicUrl =
+      entry?.publicUrl ||
+      entry?.public_url ||
+      toPublicUrlFromGcs(gcsPath) ||
+      toLocalUrl("audio", gcsPath);
+
+    const filename =
+      entry?.filename ||
+      (gcsPath ? path.basename(gcsPath) : `audio_${index + 1}`);
+
+    return {
+      gcsPath,
+      publicUrl,
+      filename,
+    };
+  };
+
+  try {
+    const parsed = JSON.parse(audioPath);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((entry, idx) => mapEntry(entry, idx))
+        .filter((a) => a.gcsPath || a.publicUrl);
+    }
+  } catch (e) {
+    // Not JSON, fall back to single entry
+  }
+
+  return [mapEntry(audioPath, 0)];
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, "../uploads", file.fieldname);
@@ -62,58 +114,6 @@ const fileFilter = (req, file, cb) => {
       );
     }
   } else if (file.fieldname === "audio") {
-    // Helpers
-    const toPublicUrlFromGcs = (gcsPath) => {
-      if (!gcsPath) return null;
-      if (gcsPath.startsWith("http")) return gcsPath;
-      if (gcsPath.startsWith("gs://")) return gcsService.gsToHttpUrl(gcsPath);
-      return null;
-    };
-
-    const toLocalUrl = (type, filePath) => {
-      if (!filePath) return null;
-      const filename = filePath.split("/").pop();
-      return `/api/uploads/${type}/${filename}`;
-    };
-
-    const parseAudioFiles = (audioPath) => {
-      if (!audioPath) return [];
-
-      const mapEntry = (entry, index) => {
-        const gcsPath =
-          entry?.gcsPath ||
-          entry?.gcs_path ||
-          (typeof entry === "string" ? entry : null);
-        const publicUrl =
-          entry?.publicUrl ||
-          entry?.public_url ||
-          toPublicUrlFromGcs(gcsPath) ||
-          toLocalUrl("audio", gcsPath);
-
-        const filename =
-          entry?.filename ||
-          (gcsPath ? path.basename(gcsPath) : `audio_${index + 1}`);
-
-        return {
-          gcsPath,
-          publicUrl,
-          filename,
-        };
-      };
-
-      try {
-        const parsed = JSON.parse(audioPath);
-        if (Array.isArray(parsed)) {
-          return parsed
-            .map((entry, idx) => mapEntry(entry, idx))
-            .filter((a) => a.gcsPath || a.publicUrl);
-        }
-      } catch (e) {
-        // Not JSON, treat as single path below
-      }
-
-      return [mapEntry(audioPath, 0)];
-    };
     if (UPLOAD_CONFIG.AUDIO.allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {

@@ -44,7 +44,7 @@ export default function SubmissionDetails() {
     } catch (error) {
       console.error("Error loading submission:", error);
       toast.error("Failed to load submission");
-      navigate("/submissions");
+      navigate("/admin/submissions");
     } finally {
       setLoading(false);
     }
@@ -74,6 +74,21 @@ export default function SubmissionDetails() {
     } catch (error) {
       toast.error(
         error.response?.data?.error || "Failed to start voice cloning"
+      );
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  const handleProcessVoice = async () => {
+    setActionLoading("process");
+    try {
+      await voiceApi.process(id);
+      toast.success("Voice processed and audio generation started/completed");
+      loadSubmission();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || "Failed to process voice pipeline"
       );
     } finally {
       setActionLoading("");
@@ -209,7 +224,10 @@ export default function SubmissionDetails() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link to="/admin" className="p-2 hover:bg-gray-100 rounded-lg">
+        <Link
+          to="/admin/submissions"
+          className="p-2 hover:bg-gray-100 rounded-lg"
+        >
           <ArrowLeftIcon className="w-5 h-5" />
         </Link>
         <div className="flex-1">
@@ -408,6 +426,21 @@ export default function SubmissionDetails() {
           <div className="card">
             <h3 className="font-semibold text-gray-900 mb-4">Actions</h3>
             <div className="space-y-3">
+              <button
+                onClick={handleProcessVoice}
+                disabled={actionLoading === "process"}
+                className="w-full btn-primary justify-center disabled:opacity-50"
+              >
+                {actionLoading === "process" ? (
+                  <span className="flex items-center gap-2">
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </span>
+                ) : (
+                  "Process Voice (Clone + Generate)"
+                )}
+              </button>
+
               {submission.consent_status !== "verified" && (
                 <button
                   onClick={handleSendConsent}

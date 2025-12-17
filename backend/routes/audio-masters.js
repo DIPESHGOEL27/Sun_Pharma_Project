@@ -190,13 +190,25 @@ router.post(
         return res.status(400).json({ error: "Audio file is required" });
       }
 
-      // Validate audio
+      // Validate audio - skip duration check for master audio files
+      // Master audio files are short script recordings, not voice samples
       const validation = await validateAudio(req.file.path);
-      if (!validation.isValid) {
+      
+      // For master audio, we only check format, size, and sample rate
+      // Duration check is skipped as master files can be short
+      const criticalChecks = ['exists', 'format', 'size'];
+      const criticalErrors = validation.errors.filter(err => 
+        !err.toLowerCase().includes('duration')
+      );
+      
+      if (criticalErrors.length > 0) {
         fs.unlinkSync(req.file.path);
         return res.status(400).json({
           error: "Audio validation failed",
-          details: validation,
+          details: {
+            ...validation,
+            errors: criticalErrors
+          },
         });
       }
 

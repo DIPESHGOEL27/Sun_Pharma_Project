@@ -166,7 +166,10 @@ async function speechToSpeech(
   const langConfig =
     SUPPORTED_LANGUAGES[languageCode] || SUPPORTED_LANGUAGES["en"];
   // Use STS-specific model for speech-to-speech (not TTS model)
-  const modelId = options.modelId || langConfig.elevenLabsStsModel || "eleven_multilingual_sts_v2";
+  const modelId =
+    options.modelId ||
+    langConfig.elevenLabsStsModel ||
+    "eleven_multilingual_sts_v2";
   const voiceSettings = {
     ...langConfig.voiceSettings,
     ...options.voiceSettings,
@@ -236,7 +239,8 @@ async function speechToSpeechStream(
     SUPPORTED_LANGUAGES[languageCode] || SUPPORTED_LANGUAGES["en"];
 
   // Use STS-specific model for speech-to-speech (not TTS model)
-  const stsModel = langConfig.elevenLabsStsModel || "eleven_multilingual_sts_v2";
+  const stsModel =
+    langConfig.elevenLabsStsModel || "eleven_multilingual_sts_v2";
   logger.info(`[ELEVENLABS] Using STS model: ${stsModel}`);
 
   const form = new FormData();

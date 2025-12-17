@@ -9,6 +9,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Hindi",
     nativeName: "हिन्दी",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -21,6 +22,7 @@ const SUPPORTED_LANGUAGES = {
     name: "English",
     nativeName: "English",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -33,6 +35,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Marathi",
     nativeName: "मराठी",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -45,6 +48,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Gujarati",
     nativeName: "ગુજરાતી",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -57,6 +61,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Tamil",
     nativeName: "தமிழ்",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -69,6 +74,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Telugu",
     nativeName: "తెలుగు",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -81,6 +87,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Kannada",
     nativeName: "ಕನ್ನಡ",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -93,6 +100,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Bengali",
     nativeName: "বাংলা",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -105,6 +113,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Malayalam",
     nativeName: "മലയാളം",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -117,6 +126,7 @@ const SUPPORTED_LANGUAGES = {
     name: "Punjabi",
     nativeName: "ਪੰਜਾਬੀ",
     elevenLabsModel: "eleven_multilingual_v2",
+    elevenLabsStsModel: "eleven_multilingual_sts_v2",
     voiceSettings: {
       stability: 0.5,
       similarity_boost: 0.75,

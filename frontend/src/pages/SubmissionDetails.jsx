@@ -414,17 +414,26 @@ export default function SubmissionDetails() {
                     </div>
                     <div className="flex items-center gap-2">
                       <AudioStatusBadge status={audio.status} />
-                      {(audio.public_url || audio.gcs_path || audio.file_path) && audio.status === "completed" && (
-                        <a
-                          href={audio.public_url || audio.gcs_path || `/api/uploads/generated_audio/${submission.id}/${audio.file_path?.split('/').pop()}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-1"
-                        >
-                          <ArrowDownTrayIcon className="w-4 h-4" />
-                          Download
-                        </a>
-                      )}
+                      {(audio.public_url ||
+                        audio.gcs_path ||
+                        audio.file_path) &&
+                        audio.status === "completed" && (
+                          <a
+                            href={
+                              audio.public_url ||
+                              audio.gcs_path ||
+                              `/api/uploads/generated_audio/${
+                                submission.id
+                              }/${audio.file_path?.split("/").pop()}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-1"
+                          >
+                            <ArrowDownTrayIcon className="w-4 h-4" />
+                            Download
+                          </a>
+                        )}
                     </div>
                   </div>
                 ))}

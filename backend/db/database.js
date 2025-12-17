@@ -476,9 +476,7 @@ async function initDatabase() {
   }
 
   // Migration: Add public_url column to generated_audio table
-  const generatedAudioColumns = [
-    { name: "public_url", type: "TEXT" },
-  ];
+  const generatedAudioColumns = [{ name: "public_url", type: "TEXT" }];
 
   for (const col of generatedAudioColumns) {
     try {

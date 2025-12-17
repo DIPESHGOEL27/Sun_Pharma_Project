@@ -643,7 +643,9 @@ router.post("/process/:submissionId", async (req, res) => {
           publicUrl = uploadResult.publicUrl;
           logger.info(`[VOICE] Uploaded generated audio to GCS: ${publicUrl}`);
         } catch (uploadErr) {
-          logger.warn(`[VOICE] Failed to upload to GCS, using local path: ${uploadErr.message}`);
+          logger.warn(
+            `[VOICE] Failed to upload to GCS, using local path: ${uploadErr.message}`
+          );
           // Fall back to local path if GCS upload fails
           publicUrl = `/api/uploads/generated_audio/${submissionId}/${outputFilename}`;
         }
@@ -656,7 +658,15 @@ router.post("/process/:submissionId", async (req, res) => {
           )
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `
-        ).run(submissionId, langCode, audioMaster.id, outputPath, gcsPath, publicUrl, "completed");
+        ).run(
+          submissionId,
+          langCode,
+          audioMaster.id,
+          outputPath,
+          gcsPath,
+          publicUrl,
+          "completed"
+        );
 
         results.push({
           language: langCode,

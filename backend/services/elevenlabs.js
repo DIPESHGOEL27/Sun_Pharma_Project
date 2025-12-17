@@ -327,12 +327,12 @@ async function checkApiHealth() {
   try {
     // Try to list voices as a health check
     const voices = await listVoices();
-    
+
     // If we can list voices, the API is working
     return {
       healthy: true,
       voicesAvailable: voices?.voices?.length || 0,
-      message: "ElevenLabs API is operational"
+      message: "ElevenLabs API is operational",
     };
   } catch (error) {
     logger.error("[ELEVENLABS] Health check failed:", error);

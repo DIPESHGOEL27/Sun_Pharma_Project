@@ -475,6 +475,19 @@ async function initDatabase() {
     }
   }
 
+  // Migration: Add public_url column to generated_audio table
+  const generatedAudioColumns = [
+    { name: "public_url", type: "TEXT" },
+  ];
+
+  for (const col of generatedAudioColumns) {
+    try {
+      db.run(`ALTER TABLE generated_audio ADD COLUMN ${col.name} ${col.type}`);
+    } catch (e) {
+      // Column already exists, ignore
+    }
+  }
+
   // Update emp_code from mr_code if emp_code is null
   try {
     db.run(`UPDATE medical_reps SET emp_code = mr_code WHERE emp_code IS NULL`);

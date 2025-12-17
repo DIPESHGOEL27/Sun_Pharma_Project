@@ -19,6 +19,7 @@ import {
   ClockIcon,
   PlayIcon,
   ArrowPathIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 
 export default function SubmissionDetails() {
@@ -248,8 +249,12 @@ export default function SubmissionDetails() {
             <div className="flex items-center gap-3">
               <VideoCameraIcon className="w-8 h-8 text-green-600" />
               <div>
-                <h3 className="font-semibold text-green-900">Final Video Available</h3>
-                <p className="text-sm text-green-700">Ready for download and distribution</p>
+                <h3 className="font-semibold text-green-900">
+                  Final Video Available
+                </h3>
+                <p className="text-sm text-green-700">
+                  Ready for download and distribution
+                </p>
               </div>
             </div>
             <a
@@ -293,7 +298,9 @@ export default function SubmissionDetails() {
                 : submission.voice_clone_status === "completed"
                 ? "completed"
                 : submission.voice_clone_status === "in_progress" ||
-                  submission.generated_audio?.some((a) => a.status === "processing")
+                  submission.generated_audio?.some(
+                    (a) => a.status === "processing"
+                  )
                 ? "in_progress"
                 : submission.voice_clone_status === "failed"
                 ? "failed"
@@ -311,15 +318,15 @@ export default function SubmissionDetails() {
             status={
               submission.final_video_url
                 ? "completed"
-                : submission.generated_audio?.some((a) => a.status === "completed")
+                : submission.generated_audio?.some(
+                    (a) => a.status === "completed"
+                  )
                 ? "in_progress"
                 : "pending"
             }
             icon={VideoCameraIcon}
           />
-          <PipelineConnector
-            active={!!submission.final_video_url}
-          />
+          <PipelineConnector active={!!submission.final_video_url} />
           <PipelineStep
             label="QC Review"
             status={
@@ -380,8 +387,8 @@ export default function SubmissionDetails() {
           {/* Generated Audio */}
           {submission.generated_audio?.length > 0 && (
             <div className="card">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Generated Audio
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center justify-between">
+                <span>Generated Audio (Voice Cloned)</span>
               </h3>
               <div className="space-y-3">
                 {submission.generated_audio.map((audio) => (
@@ -407,10 +414,16 @@ export default function SubmissionDetails() {
                     </div>
                     <div className="flex items-center gap-2">
                       <AudioStatusBadge status={audio.status} />
-                      {audio.file_path && (
-                        <button className="p-2 hover:bg-gray-200 rounded-lg">
-                          <PlayIcon className="w-5 h-5 text-green-600" />
-                        </button>
+                      {(audio.public_url || audio.gcs_path || audio.file_path) && audio.status === "completed" && (
+                        <a
+                          href={audio.public_url || audio.gcs_path || `/api/uploads/generated_audio/${submission.id}/${audio.file_path?.split('/').pop()}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-1"
+                        >
+                          <ArrowDownTrayIcon className="w-4 h-4" />
+                          Download
+                        </a>
                       )}
                     </div>
                   </div>
@@ -631,7 +644,8 @@ export default function SubmissionDetails() {
 
               {submission.final_video_url ? (
                 <p className="text-sm text-gray-600">
-                  Final video uploaded. You can replace it by uploading a new file below.
+                  Final video uploaded. You can replace it by uploading a new
+                  file below.
                 </p>
               ) : (
                 <p className="text-sm text-gray-600">
@@ -643,7 +657,9 @@ export default function SubmissionDetails() {
                 <input
                   type="file"
                   accept="video/*"
-                  onChange={(e) => setFinalVideoFile(e.target.files?.[0] || null)}
+                  onChange={(e) =>
+                    setFinalVideoFile(e.target.files?.[0] || null)
+                  }
                   className="block w-full text-sm text-gray-600"
                 />
                 {finalUploadProgress > 0 && (
@@ -795,7 +811,9 @@ function PipelineStep({ label, subtitle, status, icon: Icon }) {
         <Icon className="w-6 h-6" />
       </div>
       <span className="text-xs mt-2 text-gray-600 text-center">{label}</span>
-      {subtitle && <span className="text-[10px] text-gray-400">{subtitle}</span>}
+      {subtitle && (
+        <span className="text-[10px] text-gray-400">{subtitle}</span>
+      )}
     </div>
   );
 }

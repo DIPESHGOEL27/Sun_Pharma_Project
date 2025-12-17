@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { submissionsApi } from "../services/api";
 import {
   MagnifyingGlassIcon,
@@ -8,6 +8,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowLeftIcon,
+  ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 
 const STATUS_OPTIONS = [
@@ -32,6 +33,7 @@ const QC_STATUS_OPTIONS = [
 ];
 
 export default function SubmissionsList() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState([]);
   const [pagination, setPagination] = useState({
@@ -46,6 +48,12 @@ export default function SubmissionsList() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [adminRole] = useState(sessionStorage.getItem("adminRole") || "admin");
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("adminLoggedIn");
+    sessionStorage.removeItem("adminRole");
+    navigate("/admin");
+  };
 
   useEffect(() => {
     loadSubmissions();
@@ -105,12 +113,25 @@ export default function SubmissionsList() {
           )}
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Submissions</h1>
-            <p className="text-gray-500">{pagination.total} total submissions</p>
+            <p className="text-gray-500">
+              {pagination.total} total submissions
+            </p>
           </div>
         </div>
-        <Link to="/submit" target="_blank" className="btn-primary">
-          + New Submission
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/submit" target="_blank" className="btn-primary">
+            + New Submission
+          </Link>
+          {adminRole === "editor" && (
+            <button
+              onClick={handleLogout}
+              className="btn btn-outline flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+            >
+              <ArrowRightOnRectangleIcon className="w-4 h-4" />
+              Logout
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

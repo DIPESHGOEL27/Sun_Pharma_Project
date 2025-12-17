@@ -628,20 +628,42 @@ router.post("/process/:submissionId", async (req, res) => {
           langCode
         );
 
+        // Upload generated audio to GCS for download access
+        let gcsPath = null;
+        let publicUrl = null;
+        try {
+          const gcsDestination = `submissions/${submissionId}/generated_audio/${outputFilename}`;
+          const uploadResult = await gcsService.uploadFile(
+            outputPath,
+            "GENERATED_AUDIO",
+            gcsDestination,
+            { contentType: "audio/mpeg", makePublic: true }
+          );
+          gcsPath = uploadResult.gcsPath;
+          publicUrl = uploadResult.publicUrl;
+          logger.info(`[VOICE] Uploaded generated audio to GCS: ${publicUrl}`);
+        } catch (uploadErr) {
+          logger.warn(`[VOICE] Failed to upload to GCS, using local path: ${uploadErr.message}`);
+          // Fall back to local path if GCS upload fails
+          publicUrl = `/api/uploads/generated_audio/${submissionId}/${outputFilename}`;
+        }
+
         db.prepare(
           `
           INSERT INTO generated_audio (
             submission_id, language_code, audio_master_id,
-            file_path, status
+            file_path, gcs_path, public_url, status
           )
-          VALUES (?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `
-        ).run(submissionId, langCode, audioMaster.id, outputPath, "completed");
+        ).run(submissionId, langCode, audioMaster.id, outputPath, gcsPath, publicUrl, "completed");
 
         results.push({
           language: langCode,
           status: "completed",
           file_path: outputPath,
+          gcs_path: gcsPath,
+          public_url: publicUrl,
         });
       } catch (langError) {
         errors.push({ language: langCode, error: langError.message });

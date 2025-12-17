@@ -116,7 +116,7 @@ export default function AdminDashboard() {
         sessionStorage.setItem("adminLoggedIn", "true");
         setUserRole(role);
         sessionStorage.setItem("adminRole", role);
-        
+
         // Redirect editors directly to submissions page
         if (role === "editor") {
           navigate("/admin/submissions", { replace: true });

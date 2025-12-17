@@ -41,8 +41,9 @@ app.use("/api", limiter);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Static files for uploads
+// Static files for uploads (support both /uploads and /api/uploads paths)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

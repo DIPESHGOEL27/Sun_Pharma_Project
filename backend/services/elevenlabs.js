@@ -325,27 +325,14 @@ async function getUserInfo() {
  */
 async function checkApiHealth() {
   try {
-    const [user, subscription] = await Promise.all([
-      getUserInfo(),
-      getSubscriptionInfo(),
-    ]);
-
+    // Try to list voices as a health check
+    const voices = await listVoices();
+    
+    // If we can list voices, the API is working
     return {
       healthy: true,
-      user: {
-        subscription_tier: user.subscription?.tier,
-        voice_limit: user.subscription?.voice_limit,
-        can_extend_voice_limit: user.subscription?.can_extend_voice_limit,
-      },
-      subscription: {
-        character_count: subscription.character_count,
-        character_limit: subscription.character_limit,
-        remaining_characters:
-          subscription.character_limit - subscription.character_count,
-        voice_count: subscription.voice_count,
-        voice_limit: subscription.voice_limit,
-        remaining_voices: subscription.voice_limit - subscription.voice_count,
-      },
+      voicesAvailable: voices?.voices?.length || 0,
+      message: "ElevenLabs API is operational"
     };
   } catch (error) {
     logger.error("[ELEVENLABS] Health check failed:", error);

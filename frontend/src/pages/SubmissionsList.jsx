@@ -7,6 +7,7 @@ import {
   EyeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 
 const STATUS_OPTIONS = [
@@ -44,6 +45,7 @@ export default function SubmissionsList() {
     search: "",
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [adminRole] = useState(sessionStorage.getItem("adminRole") || "admin");
 
   useEffect(() => {
     loadSubmissions();
@@ -91,9 +93,20 @@ export default function SubmissionsList() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Submissions</h1>
-          <p className="text-gray-500">{pagination.total} total submissions</p>
+        <div className="flex items-center gap-4">
+          {adminRole === "admin" && (
+            <Link
+              to="/admin"
+              className="p-2 hover:bg-gray-100 rounded-lg"
+              title="Back to Dashboard"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+            </Link>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Submissions</h1>
+            <p className="text-gray-500">{pagination.total} total submissions</p>
+          </div>
         </div>
         <Link to="/submit" target="_blank" className="btn-primary">
           + New Submission

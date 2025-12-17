@@ -241,6 +241,29 @@ export default function SubmissionDetails() {
         <StatusBadge status={submission.status} large />
       </div>
 
+      {/* Final Video Download - Admin Only (Top Section) */}
+      {adminRole === "admin" && submission.final_video_url && (
+        <div className="card bg-green-50 border border-green-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <VideoCameraIcon className="w-8 h-8 text-green-600" />
+              <div>
+                <h3 className="font-semibold text-green-900">Final Video Available</h3>
+                <p className="text-sm text-green-700">Ready for download and distribution</p>
+              </div>
+            </div>
+            <a
+              href={submission.final_video_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary bg-green-600 hover:bg-green-700"
+            >
+              Download Final Video
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Progress Pipeline */}
       <div className="card">
         <h3 className="font-semibold text-gray-900 mb-4">
@@ -263,10 +286,14 @@ export default function SubmissionDetails() {
           />
           <PipelineStep
             label="Voice Clone"
+            subtitle="+ Audio Gen"
             status={
-              submission.voice_clone_status === "completed"
+              submission.generated_audio?.some((a) => a.status === "completed")
                 ? "completed"
-                : submission.voice_clone_status === "in_progress"
+                : submission.voice_clone_status === "completed"
+                ? "completed"
+                : submission.voice_clone_status === "in_progress" ||
+                  submission.generated_audio?.some((a) => a.status === "processing")
                 ? "in_progress"
                 : submission.voice_clone_status === "failed"
                 ? "failed"
@@ -275,25 +302,23 @@ export default function SubmissionDetails() {
             icon={MicrophoneIcon}
           />
           <PipelineConnector
-            active={submission.voice_clone_status === "completed"}
-          />
-          <PipelineStep
-            label="Audio Gen"
-            status={
-              submission.generated_audio?.some((a) => a.status === "completed")
-                ? "completed"
-                : submission.generated_audio?.some(
-                    (a) => a.status === "processing"
-                  )
-                ? "in_progress"
-                : "pending"
-            }
-            icon={MusicalNoteIcon}
-          />
-          <PipelineConnector
             active={submission.generated_audio?.some(
               (a) => a.status === "completed"
             )}
+          />
+          <PipelineStep
+            label="Video Gen"
+            status={
+              submission.final_video_url
+                ? "completed"
+                : submission.generated_audio?.some((a) => a.status === "completed")
+                ? "in_progress"
+                : "pending"
+            }
+            icon={VideoCameraIcon}
+          />
+          <PipelineConnector
+            active={!!submission.final_video_url}
           />
           <PipelineStep
             label="QC Review"
@@ -584,89 +609,96 @@ export default function SubmissionDetails() {
             )}
           </div>
 
-          {/* Final Video & Editor Actions */}
-          <div className="card space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <VideoCameraIcon className="w-5 h-5" />
-                Final Video (Editor)
-              </h3>
-              {submission.final_video_url && (
-                <a
-                  href={submission.final_video_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-sunpharma-blue hover:underline"
+          {/* Final Video & Editor Actions - Editor Only */}
+          {adminRole === "editor" && (
+            <div className="card space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <VideoCameraIcon className="w-5 h-5" />
+                  Upload Final Video
+                </h3>
+                {submission.final_video_url && (
+                  <a
+                    href={submission.final_video_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-sunpharma-blue hover:underline"
+                  >
+                    View Current
+                  </a>
+                )}
+              </div>
+
+              {submission.final_video_url ? (
+                <p className="text-sm text-gray-600">
+                  Final video uploaded. You can replace it by uploading a new file below.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  No final video uploaded yet. Upload the edited video here.
+                </p>
+              )}
+
+              <div className="space-y-2">
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setFinalVideoFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-600"
+                />
+                {finalUploadProgress > 0 && (
+                  <div className="text-xs text-gray-500">
+                    Uploading... {finalUploadProgress}%
+                  </div>
+                )}
+                <button
+                  onClick={handleFinalVideoUpload}
+                  disabled={!finalVideoFile || actionLoading === "final-upload"}
+                  className="btn-primary w-full justify-center disabled:opacity-50"
                 >
-                  View
-                </a>
-              )}
+                  {actionLoading === "final-upload"
+                    ? "Uploading..."
+                    : "Upload Final Video"}
+                </button>
+              </div>
             </div>
+          )}
 
-            {submission.final_video_url ? (
-              <p className="text-sm text-gray-600">
-                Final video uploaded. You can replace it by uploading a new file
-                below.
-              </p>
-            ) : (
-              <p className="text-sm text-gray-600">
-                No final video uploaded yet.
-              </p>
-            )}
-
-            <div className="space-y-2">
-              <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => setFinalVideoFile(e.target.files?.[0] || null)}
-                className="block w-full text-sm text-gray-600"
-              />
-              {finalUploadProgress > 0 && (
-                <div className="text-xs text-gray-500">
-                  Uploading... {finalUploadProgress}%
-                </div>
-              )}
-              <button
-                onClick={handleFinalVideoUpload}
-                disabled={!finalVideoFile || actionLoading === "final-upload"}
-                className="btn-primary w-full justify-center disabled:opacity-50"
-              >
-                {actionLoading === "final-upload"
-                  ? "Uploading..."
-                  : "Upload Final Video"}
-              </button>
+          {/* QC Actions - Admin Only */}
+          {adminRole === "admin" && (
+            <div className="card space-y-4">
+              <h3 className="font-semibold text-gray-900">QC Actions</h3>
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700">Action</div>
+                <select
+                  value={editorAction}
+                  onChange={(e) => setEditorAction(e.target.value)}
+                  className="input w-full"
+                >
+                  <option value="">Select action</option>
+                  <option value="approve">Approve</option>
+                  <option value="reupload">Request Re-upload</option>
+                  <option value="regenerate">Request Regeneration</option>
+                </select>
+                <textarea
+                  value={editorNotes}
+                  onChange={(e) => setEditorNotes(e.target.value)}
+                  rows={3}
+                  className="w-full p-3 border border-gray-200 rounded-lg text-sm"
+                  placeholder="Notes (optional)"
+                />
+                <button
+                  onClick={handleEditorAction}
+                  disabled={!editorAction || actionLoading === "editor-action"}
+                  className="btn-secondary w-full justify-center disabled:opacity-50"
+                >
+                  {actionLoading === "editor-action"
+                    ? "Applying..."
+                    : "Apply QC Action"}
+                </button>
+              </div>
             </div>
-
-            <div className="border-t pt-3 space-y-2">
-              <div className="text-sm font-medium text-gray-700">QC Action</div>
-              <select
-                value={editorAction}
-                onChange={(e) => setEditorAction(e.target.value)}
-                className="input w-full"
-              >
-                <option value="">Select action</option>
-                <option value="approve">Approve</option>
-                <option value="reupload">Re-upload</option>
-                <option value="regenerate">Regenerate</option>
-              </select>
-              <textarea
-                value={editorNotes}
-                onChange={(e) => setEditorNotes(e.target.value)}
-                rows={3}
-                className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                placeholder="Notes (optional)"
-              />
-              <button
-                onClick={handleEditorAction}
-                disabled={!editorAction || actionLoading === "editor-action"}
-                className="btn-secondary w-full justify-center disabled:opacity-50"
-              >
-                {actionLoading === "editor-action"
-                  ? "Applying..."
-                  : "Apply QC Action"}
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -748,7 +780,7 @@ function AudioStatusBadge({ status }) {
   );
 }
 
-function PipelineStep({ label, status, icon: Icon }) {
+function PipelineStep({ label, subtitle, status, icon: Icon }) {
   const colors = {
     pending: "bg-gray-100 text-gray-400",
     in_progress: "bg-blue-100 text-blue-600 animate-pulse",
@@ -762,7 +794,8 @@ function PipelineStep({ label, status, icon: Icon }) {
       >
         <Icon className="w-6 h-6" />
       </div>
-      <span className="text-xs mt-2 text-gray-600">{label}</span>
+      <span className="text-xs mt-2 text-gray-600 text-center">{label}</span>
+      {subtitle && <span className="text-[10px] text-gray-400">{subtitle}</span>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   DocumentTextIcon,
   UsersIcon,
@@ -59,6 +59,7 @@ const STATUS_COLORS = {
 };
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [username, setUsername] = useState("");
@@ -85,10 +86,15 @@ export default function AdminDashboard() {
   // Check if already logged in
   useEffect(() => {
     const adminLoggedIn = sessionStorage.getItem("adminLoggedIn");
+    const storedRole = sessionStorage.getItem("adminRole");
     if (adminLoggedIn === "true") {
       setIsLoggedIn(true);
+      // Redirect editors directly to submissions page
+      if (storedRole === "editor") {
+        navigate("/admin/submissions", { replace: true });
+      }
     }
-  }, []);
+  }, [navigate]);
 
   // Load data when logged in or filters change
   useEffect(() => {
@@ -105,13 +111,16 @@ export default function AdminDashboard() {
     try {
       const response = await adminApi.login(username, password);
       if (response.data.success) {
+        const role = response.data.user?.role || "admin";
         setIsLoggedIn(true);
         sessionStorage.setItem("adminLoggedIn", "true");
-        setUserRole(response.data.user?.role || "admin");
-        sessionStorage.setItem(
-          "adminRole",
-          response.data.user?.role || "admin"
-        );
+        setUserRole(role);
+        sessionStorage.setItem("adminRole", role);
+        
+        // Redirect editors directly to submissions page
+        if (role === "editor") {
+          navigate("/admin/submissions", { replace: true });
+        }
       }
     } catch (error) {
       setLoginError(

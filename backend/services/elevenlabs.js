@@ -70,6 +70,16 @@ async function cloneVoice(name, audioFilePath, description = "") {
     throw new Error("No valid audio sample files provided for cloning");
   }
 
+  // Validate each audio file before sending
+  const MIN_FILE_SIZE = 1024; // 1KB minimum
+  for (const p of validPaths) {
+    const stats = fs.statSync(p);
+    logger.info(`[ELEVENLABS] Audio file: ${p}, size: ${stats.size} bytes`);
+    if (stats.size < MIN_FILE_SIZE) {
+      throw new Error(`Audio file too small (${stats.size} bytes): ${path.basename(p)}. Minimum ${MIN_FILE_SIZE} bytes required.`);
+    }
+  }
+
   const form = new FormData();
   form.append("name", name);
   form.append("description", description || `Voice clone for ${name}`);
@@ -77,6 +87,7 @@ async function cloneVoice(name, audioFilePath, description = "") {
   validPaths.forEach((p) => {
     form.append("files", fs.createReadStream(p));
   });
+
 
   // Optional: Add labels
   form.append(
@@ -101,7 +112,15 @@ async function cloneVoice(name, audioFilePath, description = "") {
     logger.error(
       `[ELEVENLABS] Voice clone failed: ${response.status} - ${errorBody}`
     );
-    throw new Error(`Voice cloning failed: ${response.statusText}`);
+    // Parse error body for detailed message
+    let detailMessage = response.statusText;
+    try {
+      const errorJson = JSON.parse(errorBody);
+      detailMessage = errorJson.detail?.message || errorJson.detail || errorJson.message || errorBody;
+    } catch (e) {
+      detailMessage = errorBody || response.statusText;
+    }
+    throw new Error(`Voice cloning failed: ${detailMessage}`);
   }
 
   const result = await response.json();
@@ -205,7 +224,15 @@ async function speechToSpeech(
     logger.error(
       `[ELEVENLABS] Speech-to-speech failed: ${response.status} - ${errorBody}`
     );
-    throw new Error(`Speech-to-speech failed: ${response.statusText}`);
+    // Parse error body for detailed message
+    let detailMessage = response.statusText;
+    try {
+      const errorJson = JSON.parse(errorBody);
+      detailMessage = errorJson.detail?.message || errorJson.detail || errorJson.message || errorBody;
+    } catch (e) {
+      detailMessage = errorBody || response.statusText;
+    }
+    throw new Error(`Speech-to-speech failed: ${detailMessage}`);
   }
 
   const audioBuffer = await response.buffer();
@@ -263,7 +290,18 @@ async function speechToSpeechStream(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Speech-to-speech stream failed: ${response.statusText}`);
+    logger.error(
+      `[ELEVENLABS] Speech-to-speech stream failed: ${response.status} - ${errorBody}`
+    );
+    // Parse error body for detailed message
+    let detailMessage = response.statusText;
+    try {
+      const errorJson = JSON.parse(errorBody);
+      detailMessage = errorJson.detail?.message || errorJson.detail || errorJson.message || errorBody;
+    } catch (e) {
+      detailMessage = errorBody || response.statusText;
+    }
+    throw new Error(`Speech-to-speech stream failed: ${detailMessage}`);
   }
 
   // Pipe response to file

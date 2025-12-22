@@ -86,7 +86,9 @@ async function uploadFile(
       } catch (aclError) {
         // Bucket likely has uniform bucket-level access enabled
         // Public URL will still work if bucket has allUsers read access via IAM
-        logger.warn(`[GCS] Could not set individual ACL (uniform bucket access?): ${aclError.message}`);
+        logger.warn(
+          `[GCS] Could not set individual ACL (uniform bucket access?): ${aclError.message}`
+        );
       }
     }
 
@@ -131,7 +133,9 @@ async function uploadBuffer(buffer, bucketType, destinationPath, options = {}) {
         await file.makePublic();
       } catch (aclError) {
         // Bucket likely has uniform bucket-level access enabled
-        logger.warn(`[GCS] Could not set individual ACL (uniform bucket access?): ${aclError.message}`);
+        logger.warn(
+          `[GCS] Could not set individual ACL (uniform bucket access?): ${aclError.message}`
+        );
       }
     }
 

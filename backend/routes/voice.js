@@ -771,6 +771,7 @@ router.get("/list", async (req, res) => {
  */
 router.post("/cleanup", async (req, res) => {
   try {
+    const db = getDb();
     const maxAgeHours = parseInt(req.query.max_age_hours) || 24;
     const statusFilter = req.query.status_filter || 'completed';
     const dryRun = req.query.dry_run === 'true';
@@ -896,6 +897,7 @@ router.post("/cleanup", async (req, res) => {
  */
 router.delete("/cleanup/all", async (req, res) => {
   try {
+    const db = getDb();
     if (req.query.confirm !== 'true') {
       return res.status(400).json({
         error: 'Confirmation required',
@@ -981,6 +983,7 @@ router.delete("/cleanup/all", async (req, res) => {
  */
 router.get("/active", async (req, res) => {
   try {
+    const db = getDb();
     const activeVoices = db.prepare(`
       SELECT 
         s.id,

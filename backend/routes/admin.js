@@ -1257,4 +1257,211 @@ router.get("/metrics", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/per-language-stats
+ * Get detailed per-language audio and video generation statistics
+ */
+router.get("/per-language-stats", async (req, res) => {
+  try {
+    const db = getDb();
+
+    // Audio generation stats by language
+    const audioByLanguage = db.prepare(`
+      SELECT 
+        language_code,
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+      FROM generated_audio
+      GROUP BY language_code
+      ORDER BY total DESC
+    `).all();
+
+    // Video generation stats by language
+    const videoByLanguage = db.prepare(`
+      SELECT 
+        language_code,
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+      FROM generated_videos
+      GROUP BY language_code
+      ORDER BY total DESC
+    `).all();
+
+    // Submissions with incomplete languages (audio not generated for all selected languages)
+    const incompleteAudio = db.prepare(`
+      SELECT 
+        s.id,
+        s.doctor_name,
+        s.selected_languages,
+        s.status,
+        s.created_at,
+        (SELECT COUNT(*) FROM generated_audio ga WHERE ga.submission_id = s.id AND ga.status = 'completed') as audio_completed,
+        (SELECT COUNT(*) FROM generated_audio ga WHERE ga.submission_id = s.id AND ga.status = 'failed') as audio_failed
+      FROM submissions s
+      WHERE s.status NOT IN ('draft', 'completed', 'failed')
+      ORDER BY s.created_at DESC
+      LIMIT 50
+    `).all();
+
+    // Parse selected_languages and filter incomplete
+    const incompleteSubmissions = incompleteAudio
+      .map(s => {
+        const selectedLangs = JSON.parse(s.selected_languages || '[]');
+        return {
+          ...s,
+          selected_languages: selectedLangs,
+          total_languages: selectedLangs.length,
+          audio_completed: s.audio_completed,
+          audio_failed: s.audio_failed,
+          audio_remaining: selectedLangs.length - s.audio_completed - s.audio_failed
+        };
+      })
+      .filter(s => s.audio_remaining > 0 || s.audio_failed > 0);
+
+    // Active voice clones (not yet deleted)
+    const activeVoices = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM submissions 
+      WHERE voice_clone_status = 'completed' 
+        AND elevenlabs_voice_id IS NOT NULL
+    `).get();
+
+    // Per-language QC status
+    const qcByLanguage = db.prepare(`
+      SELECT 
+        ga.language_code,
+        COUNT(*) as total,
+        COUNT(CASE WHEN s.qc_status = 'approved' THEN 1 END) as approved,
+        COUNT(CASE WHEN s.qc_status = 'rejected' THEN 1 END) as rejected,
+        COUNT(CASE WHEN s.qc_status = 'pending' THEN 1 END) as pending
+      FROM generated_audio ga
+      JOIN submissions s ON ga.submission_id = s.id
+      WHERE ga.status = 'completed'
+      GROUP BY ga.language_code
+      ORDER BY total DESC
+    `).all();
+
+    // Summary stats
+    const totalAudio = db.prepare("SELECT COUNT(*) as count FROM generated_audio WHERE status = 'completed'").get();
+    const totalVideo = db.prepare("SELECT COUNT(*) as count FROM generated_videos WHERE status = 'completed'").get();
+    const totalSubmissionsWithAllLangs = db.prepare(`
+      SELECT COUNT(*) as count FROM submissions s
+      WHERE NOT EXISTS (
+        SELECT 1 FROM (
+          SELECT value as lang FROM submissions, json_each(selected_languages) WHERE id = s.id
+        ) langs
+        WHERE NOT EXISTS (
+          SELECT 1 FROM generated_audio ga 
+          WHERE ga.submission_id = s.id 
+            AND ga.language_code = langs.lang 
+            AND ga.status = 'completed'
+        )
+      )
+      AND s.status NOT IN ('draft')
+      AND json_array_length(s.selected_languages) > 0
+    `).get();
+
+    res.json({
+      summary: {
+        total_audio_generated: totalAudio.count,
+        total_videos_uploaded: totalVideo.count,
+        active_voice_clones: activeVoices.count,
+        submissions_with_all_languages_complete: totalSubmissionsWithAllLangs.count
+      },
+      audio_by_language: audioByLanguage.map(a => ({
+        ...a,
+        language_name: SUPPORTED_LANGUAGES[a.language_code]?.name || a.language_code
+      })),
+      video_by_language: videoByLanguage.map(v => ({
+        ...v,
+        language_name: SUPPORTED_LANGUAGES[v.language_code]?.name || v.language_code
+      })),
+      qc_by_language: qcByLanguage.map(q => ({
+        ...q,
+        language_name: SUPPORTED_LANGUAGES[q.language_code]?.name || q.language_code
+      })),
+      incomplete_submissions: incompleteSubmissions.slice(0, 20)
+    });
+  } catch (error) {
+    logger.error("[ADMIN] Error fetching per-language stats:", error);
+    res.status(500).json({ error: "Failed to fetch per-language statistics" });
+  }
+});
+
+/**
+ * GET /api/admin/voice-management
+ * Get voice clone management data for scheduled cleanup
+ */
+router.get("/voice-management", async (req, res) => {
+  try {
+    const db = getDb();
+
+    // Get all active voices with their age and usage
+    const activeVoices = db.prepare(`
+      SELECT 
+        s.id as submission_id,
+        s.doctor_name,
+        s.elevenlabs_voice_id,
+        s.voice_clone_status,
+        s.status as submission_status,
+        s.created_at,
+        s.updated_at,
+        COUNT(DISTINCT ga.id) as audio_generated_count,
+        COUNT(DISTINCT gv.id) as videos_uploaded_count,
+        GROUP_CONCAT(DISTINCT ga.language_code) as languages_with_audio
+      FROM submissions s
+      LEFT JOIN generated_audio ga ON s.id = ga.submission_id AND ga.status = 'completed'
+      LEFT JOIN generated_videos gv ON s.id = gv.submission_id AND gv.status = 'completed'
+      WHERE s.elevenlabs_voice_id IS NOT NULL
+      GROUP BY s.id
+      ORDER BY s.updated_at ASC
+    `).all();
+
+    // Calculate age in hours for each voice
+    const now = Date.now();
+    const voicesWithAge = activeVoices.map(v => {
+      const ageMs = now - new Date(v.updated_at).getTime();
+      const ageHours = Math.round(ageMs / (1000 * 60 * 60));
+      return {
+        ...v,
+        age_hours: ageHours,
+        languages_with_audio: v.languages_with_audio ? v.languages_with_audio.split(',') : [],
+        can_delete: v.submission_status === 'completed' || v.submission_status === 'failed',
+        recommended_for_cleanup: ageHours >= 24 && (v.submission_status === 'completed' || v.submission_status === 'failed')
+      };
+    });
+
+    // Get ElevenLabs account status
+    let elevenLabsStatus = null;
+    try {
+      elevenLabsStatus = await elevenLabs.checkApiHealth();
+    } catch (err) {
+      logger.warn("[ADMIN] Could not fetch ElevenLabs status:", err.message);
+    }
+
+    // Count voices eligible for cleanup (24+ hours old, completed/failed status)
+    const eligibleForCleanup = voicesWithAge.filter(v => v.recommended_for_cleanup).length;
+    const totalActive = voicesWithAge.filter(v => v.voice_clone_status === 'completed').length;
+
+    res.json({
+      summary: {
+        total_active_voices: totalActive,
+        eligible_for_cleanup: eligibleForCleanup,
+        elevenlabs_quota: elevenLabsStatus?.subscription || null
+      },
+      voices: voicesWithAge,
+      cleanup_recommendation: eligibleForCleanup > 0 
+        ? `${eligibleForCleanup} voice(s) are 24+ hours old and ready for cleanup`
+        : 'No voices currently need cleanup'
+    });
+  } catch (error) {
+    logger.error("[ADMIN] Error fetching voice management data:", error);
+    res.status(500).json({ error: "Failed to fetch voice management data" });
+  }
+});
+
 module.exports = router;

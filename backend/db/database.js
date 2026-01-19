@@ -476,11 +476,33 @@ async function initDatabase() {
   }
 
   // Migration: Add public_url column to generated_audio table
-  const generatedAudioColumns = [{ name: "public_url", type: "TEXT" }];
+  const generatedAudioColumns = [
+    { name: "public_url", type: "TEXT" },
+    { name: "qc_status", type: "TEXT DEFAULT 'pending'" },
+    { name: "qc_notes", type: "TEXT" },
+    { name: "qc_reviewed_by", type: "TEXT" },
+    { name: "qc_reviewed_at", type: "DATETIME" }
+  ];
 
   for (const col of generatedAudioColumns) {
     try {
       db.run(`ALTER TABLE generated_audio ADD COLUMN ${col.name} ${col.type}`);
+    } catch (e) {
+      // Column already exists, ignore
+    }
+  }
+
+  // Migration: Add QC columns to generated_videos table
+  const generatedVideosColumns = [
+    { name: "qc_status", type: "TEXT DEFAULT 'pending'" },
+    { name: "qc_notes", type: "TEXT" },
+    { name: "qc_reviewed_by", type: "TEXT" },
+    { name: "qc_reviewed_at", type: "DATETIME" }
+  ];
+
+  for (const col of generatedVideosColumns) {
+    try {
+      db.run(`ALTER TABLE generated_videos ADD COLUMN ${col.name} ${col.type}`);
     } catch (e) {
       // Column already exists, ignore
     }

@@ -20,6 +20,8 @@ import {
   PlayIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
+  GlobeAltIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 
 export default function SubmissionDetails() {
@@ -33,10 +35,19 @@ export default function SubmissionDetails() {
   const [finalUploadProgress, setFinalUploadProgress] = useState(0);
   const [editorAction, setEditorAction] = useState("");
   const [editorNotes, setEditorNotes] = useState("");
+  const [languageStatus, setLanguageStatus] = useState(null);
+  const [perLanguageVideoFiles, setPerLanguageVideoFiles] = useState({});
+  const [perLanguageUploadProgress, setPerLanguageUploadProgress] = useState({});
 
   useEffect(() => {
     loadSubmission();
   }, [id]);
+
+  useEffect(() => {
+    if (submission?.id) {
+      loadLanguageStatus();
+    }
+  }, [submission?.id]);
 
   const loadSubmission = async () => {
     try {
@@ -48,6 +59,15 @@ export default function SubmissionDetails() {
       navigate("/admin/submissions");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLanguageStatus = async () => {
+    try {
+      const response = await submissionsApi.getLanguages(id);
+      setLanguageStatus(response.data);
+    } catch (error) {
+      console.error("Error loading language status:", error);
     }
   };
 
@@ -204,6 +224,97 @@ export default function SubmissionDetails() {
       toast.error(
         error.response?.data?.error || "Failed to update submission status"
       );
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  // Per-language video upload handler
+  const handleLanguageVideoUpload = async (languageCode) => {
+    const file = perLanguageVideoFiles[languageCode];
+    if (!file) {
+      toast.error(`Please select a video file for ${languageCode.toUpperCase()}`);
+      return;
+    }
+
+    setActionLoading(`upload-${languageCode}`);
+    setPerLanguageUploadProgress(prev => ({ ...prev, [languageCode]: 0 }));
+
+    try {
+      // Get signed URL for upload
+      const { data } = await storageApi.getSignedUploadUrl(
+        file.name,
+        file.type,
+        "GENERATED_VIDEOS",
+        `${submission.id}/${languageCode}`
+      );
+
+      // Upload to GCS
+      await storageApi.uploadToGCS(data.uploadUrl, file, (percent) => {
+        setPerLanguageUploadProgress(prev => ({ ...prev, [languageCode]: percent }));
+      });
+
+      // Register the video in the backend
+      await submissionsApi.saveLanguageVideo(submission.id, languageCode, {
+        gcsPath: data.gcsPath,
+        publicUrl: data.publicUrl,
+        uploadedBy: adminRole,
+        duration_seconds: null, // Could extract from video if needed
+      });
+
+      toast.success(`Video uploaded for ${languageCode.toUpperCase()}`);
+      setPerLanguageVideoFiles(prev => ({ ...prev, [languageCode]: null }));
+      setPerLanguageUploadProgress(prev => ({ ...prev, [languageCode]: 0 }));
+      loadSubmission();
+      loadLanguageStatus();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || `Failed to upload video for ${languageCode}`
+      );
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  // Per-language QC approve handler
+  const handleApproveLanguage = async (languageCode, approveAudio, approveVideo) => {
+    setActionLoading(`approve-${languageCode}`);
+    try {
+      await qcApi.approveLanguage(submission.id, languageCode, {
+        approve_audio: approveAudio,
+        approve_video: approveVideo,
+        reviewer_name: adminRole,
+        notes: `Approved by ${adminRole}`,
+      });
+      toast.success(`${languageCode.toUpperCase()} approved`);
+      loadSubmission();
+      loadLanguageStatus();
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to approve");
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  // Per-language QC reject handler
+  const handleRejectLanguage = async (languageCode, rejectAudio, rejectVideo, reason) => {
+    if (!reason) {
+      toast.error("Please provide a rejection reason");
+      return;
+    }
+    setActionLoading(`reject-${languageCode}`);
+    try {
+      await qcApi.rejectLanguage(submission.id, languageCode, {
+        reject_audio: rejectAudio,
+        reject_video: rejectVideo,
+        reviewer_name: adminRole,
+        rejection_reason: reason,
+      });
+      toast.success(`${languageCode.toUpperCase()} rejected`);
+      loadSubmission();
+      loadLanguageStatus();
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to reject");
     } finally {
       setActionLoading("");
     }
@@ -383,6 +494,55 @@ export default function SubmissionDetails() {
               ))}
             </div>
           </div>
+
+          {/* Per-Language Status and Actions */}
+          {languageStatus && languageStatus.languages?.length > 0 && (
+            <div className="card">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <GlobeAltIcon className="w-5 h-5" />
+                Per-Language Status
+              </h3>
+              
+              {/* Summary */}
+              <div className="grid grid-cols-4 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{languageStatus.summary?.total_languages || 0}</div>
+                  <div className="text-xs text-gray-500">Total Languages</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{languageStatus.summary?.audio_completed || 0}</div>
+                  <div className="text-xs text-gray-500">Audio Ready</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{languageStatus.summary?.videos_completed || 0}</div>
+                  <div className="text-xs text-gray-500">Videos Ready</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-emerald-600">{languageStatus.summary?.ready_for_qc || 0}</div>
+                  <div className="text-xs text-gray-500">Ready for QC</div>
+                </div>
+              </div>
+
+              {/* Per-language details */}
+              <div className="space-y-4">
+                {languageStatus.languages.map((lang) => (
+                  <LanguageStatusCard
+                    key={lang.language_code}
+                    lang={lang}
+                    adminRole={adminRole}
+                    submissionId={submission.id}
+                    actionLoading={actionLoading}
+                    perLanguageVideoFiles={perLanguageVideoFiles}
+                    perLanguageUploadProgress={perLanguageUploadProgress}
+                    setPerLanguageVideoFiles={setPerLanguageVideoFiles}
+                    onUpload={handleLanguageVideoUpload}
+                    onApprove={handleApproveLanguage}
+                    onReject={handleRejectLanguage}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Generated Audio */}
           {submission.generated_audio?.length > 0 && (
@@ -858,5 +1018,199 @@ function ValidationCard({ title, isValid, checks }) {
         {isValid ? "All checks passed" : "Validation issues found"}
       </p>
     </div>
+  );
+}
+
+function LanguageStatusCard({
+  lang,
+  adminRole,
+  submissionId,
+  actionLoading,
+  perLanguageVideoFiles,
+  perLanguageUploadProgress,
+  setPerLanguageVideoFiles,
+  onUpload,
+  onApprove,
+  onReject,
+}) {
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectForm, setShowRejectForm] = useState(false);
+
+  const langCode = lang.language_code;
+  const audioComplete = lang.audio_complete;
+  const videoComplete = lang.video_complete;
+  const readyForQC = lang.ready_for_qc;
+
+  const audioQcStatus = lang.audio?.qc_status || 'pending';
+  const videoQcStatus = lang.video?.qc_status || 'pending';
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-lg">{langCode.toUpperCase()}</span>
+          {readyForQC && (
+            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
+              Ready for QC
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <QcStatusBadge status={audioQcStatus} label="Audio" />
+          <QcStatusBadge status={videoQcStatus} label="Video" />
+        </div>
+      </div>
+
+      {/* Audio Status */}
+      <div className="grid grid-cols-2 gap-4 mb-3">
+        <div className="p-3 bg-gray-50 rounded">
+          <div className="flex items-center gap-2 mb-1">
+            <MusicalNoteIcon className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium">Audio</span>
+          </div>
+          {lang.audio ? (
+            <div className="space-y-1">
+              <AudioStatusBadge status={lang.audio.status} />
+              {lang.audio.public_url && lang.audio.status === 'completed' && (
+                <a
+                  href={lang.audio.public_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline block"
+                >
+                  Download Audio
+                </a>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">Not generated</span>
+          )}
+        </div>
+
+        {/* Video Status */}
+        <div className="p-3 bg-gray-50 rounded">
+          <div className="flex items-center gap-2 mb-1">
+            <VideoCameraIcon className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-medium">Video</span>
+          </div>
+          {lang.video ? (
+            <div className="space-y-1">
+              <AudioStatusBadge status={lang.video.status} />
+              {lang.video.gcs_path && lang.video.status === 'completed' && (
+                <a
+                  href={lang.video.file_path || lang.video.gcs_path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-purple-600 hover:underline block"
+                >
+                  Download Video
+                </a>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">Not uploaded</span>
+          )}
+        </div>
+      </div>
+
+      {/* Editor: Video Upload */}
+      {adminRole === 'editor' && audioComplete && (
+        <div className="border-t pt-3 mt-3">
+          <div className="text-sm font-medium mb-2">Upload Video for {langCode.toUpperCase()}</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="video/*"
+              onChange={(e) => setPerLanguageVideoFiles(prev => ({
+                ...prev,
+                [langCode]: e.target.files?.[0] || null
+              }))}
+              className="text-xs flex-1"
+            />
+            <button
+              onClick={() => onUpload(langCode)}
+              disabled={!perLanguageVideoFiles[langCode] || actionLoading === `upload-${langCode}`}
+              className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {actionLoading === `upload-${langCode}` 
+                ? `${perLanguageUploadProgress[langCode] || 0}%` 
+                : 'Upload'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Admin: QC Actions */}
+      {adminRole === 'admin' && readyForQC && (
+        <div className="border-t pt-3 mt-3">
+          <div className="text-sm font-medium mb-2">QC Actions</div>
+          
+          {!showRejectForm ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onApprove(langCode, true, true)}
+                disabled={actionLoading === `approve-${langCode}`}
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+                {actionLoading === `approve-${langCode}` ? 'Approving...' : 'Approve Both'}
+              </button>
+              <button
+                onClick={() => setShowRejectForm(true)}
+                className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Reject
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Rejection reason (required)"
+                className="w-full p-2 text-sm border rounded"
+                rows={2}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    onReject(langCode, true, true, rejectReason);
+                    setShowRejectForm(false);
+                    setRejectReason("");
+                  }}
+                  disabled={!rejectReason || actionLoading === `reject-${langCode}`}
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                >
+                  {actionLoading === `reject-${langCode}` ? 'Rejecting...' : 'Confirm Reject'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRejectForm(false);
+                    setRejectReason("");
+                  }}
+                  className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QcStatusBadge({ status, label }) {
+  const config = {
+    pending: { bg: "bg-gray-100", text: "text-gray-600" },
+    approved: { bg: "bg-green-100", text: "text-green-700" },
+    rejected: { bg: "bg-red-100", text: "text-red-700" },
+  };
+  const c = config[status] || config.pending;
+  return (
+    <span className={`px-2 py-0.5 text-xs font-medium rounded ${c.bg} ${c.text}`}>
+      {label}: {status}
+    </span>
   );
 }

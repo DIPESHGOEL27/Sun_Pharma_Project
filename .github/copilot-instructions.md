@@ -233,6 +233,27 @@ All API calls go through `frontend/src/services/api.js`:
 - Service: `backend/services/gcsService.js`
 - Auth: Service account key at `/opt/sunpharma/credentials/gcp-key.json`
 
+#### Uniform Bucket-Level Access
+
+All GCS buckets use **uniform bucket-level access** (no per-object ACLs). This means:
+
+- `file.makePublic()` will fail - this is expected and handled gracefully
+- Public URLs work if bucket IAM grants `allUsers` the `Storage Object Viewer` role
+- The code logs a warning but continues successfully:
+
+```javascript
+// gcsService.js handles this gracefully
+if (makePublic) {
+  try {
+    await file.makePublic();
+  } catch (aclError) {
+    logger.warn(`[GCS] Could not set individual ACL (uniform bucket access?)`);
+  }
+}
+```
+
+**Do not** try to fix "uniform bucket-level access" errors by changing code - configure bucket IAM instead.
+
 ### Google Sheets (QC Sync)
 
 - Sheet ID: `1Tpjl1Qebk6H8JhkgUG4mdiQtJQfzlqKtRQUkDEllPgA`
@@ -245,6 +266,21 @@ All API calls go through `frontend/src/services/api.js`:
 - Service: `backend/services/elevenlabs.js`
 - Workflow: Upload doctor audio → Clone voice → Generate speech-to-speech per language
 - Voice IDs stored in `submissions.elevenlabs_voice_id`
+
+#### Model Selection (CRITICAL)
+
+| Use Case | Model ID | Notes |
+|----------|----------|-------|
+| **Speech-to-Speech** | `eleven_multilingual_sts_v2` | Voice conversion/cloning output |
+| **Text-to-Speech** | `eleven_multilingual_v2` | TTS only, does NOT support voice conversion |
+
+**Important**: The `elevenLabsModel` in `constants.js` is for TTS. For speech-to-speech, always use `elevenLabsStsModel` which defaults to `eleven_multilingual_sts_v2`. Using the wrong model will cause "model_can_not_do_voice_conversion" errors.
+
+```javascript
+// Correct STS usage in elevenlabs.js
+const stsModel = langConfig.elevenLabsStsModel || "eleven_multilingual_sts_v2";
+form.append("model_id", stsModel);
+```
 
 ---
 
@@ -299,7 +335,47 @@ CSV columns: `name`, `mr_code`, `emp_code`, `phone`, `email`, `designation`, `hq
 | `bn` | Bengali   |
 | `pa` | Punjabi   |
 
-Each has ElevenLabs model mappings (`eleven_multilingual_v2`) and voice settings.
+Each language config includes:
+- `elevenLabsModel`: `eleven_multilingual_v2` (for TTS)
+- `elevenLabsStsModel`: `eleven_multilingual_sts_v2` (for speech-to-speech)
+- `voiceSettings`: stability, similarity_boost, style, use_speaker_boost
+
+---
+
+## Audio Validation Limits
+
+Defined in `backend/utils/constants.js`:
+
+| Constant | Value | Purpose |
+|----------|-------|--------|
+| `AUDIO_MIN_DURATION_SECONDS` | 60 | Minimum audio sample duration |
+| `AUDIO_MAX_FILES` | 5 | Max audio files per submission |
+| `AUDIO_MIN_SAMPLE_RATE` | 44100 | Minimum sample rate (Hz) |
+| `MAX_CONSENT_ATTEMPTS` | 3 | Max OTP verification attempts |
+
+---
+
+## Voice Processing Pipeline
+
+Endpoint: `POST /api/voice/process/:submissionId`
+
+```
+1. Fetch submission + audio samples from DB
+2. Clone voice via ElevenLabs API
+   → Returns voice_id (e.g., "4cle1YIenQcR6mFOJ6pa")
+3. For each language with master audio:
+   a. Run speech-to-speech with eleven_multilingual_sts_v2
+   b. Save MP3 locally to /app/uploads/generated_audio/{id}/
+   c. Upload to GCS bucket
+   d. Store paths in generated_audio table
+4. Delete cloned voice from ElevenLabs (cleanup)
+5. Return results with public URLs
+```
+
+**Key files:**
+- `backend/routes/voice.js` - Processing endpoint
+- `backend/services/elevenlabs.js` - ElevenLabs API wrapper
+- `backend/services/gcsService.js` - GCS upload/download
 
 ---
 

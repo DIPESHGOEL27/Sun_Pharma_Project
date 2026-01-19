@@ -710,4 +710,308 @@ router.get("/history/:submissionId", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/qc/per-language/:submissionId
+ * Get per-language QC status for a submission
+ */
+router.get("/per-language/:submissionId", async (req, res) => {
+  try {
+    const db = getDb();
+    const { submissionId } = req.params;
+
+    const submission = db
+      .prepare("SELECT id, selected_languages, qc_status FROM submissions WHERE id = ?")
+      .get(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
+
+    // Get all generated audio with their QC status
+    const generatedAudio = db.prepare(`
+      SELECT 
+        ga.*,
+        am.title as audio_master_title
+      FROM generated_audio ga
+      LEFT JOIN audio_masters am ON ga.audio_master_id = am.id
+      WHERE ga.submission_id = ?
+    `).all(submissionId);
+
+    // Get all generated videos
+    const generatedVideos = db.prepare(`
+      SELECT * FROM generated_videos WHERE submission_id = ?
+    `).all(submissionId);
+
+    // Build per-language status
+    const languages = selectedLanguages.map(langCode => {
+      const audio = generatedAudio.find(a => a.language_code === langCode);
+      const video = generatedVideos.find(v => v.language_code === langCode);
+
+      return {
+        language_code: langCode,
+        audio: audio ? {
+          id: audio.id,
+          status: audio.status,
+          file_path: audio.file_path,
+          gcs_path: audio.gcs_path,
+          public_url: audio.public_url,
+          audio_master_title: audio.audio_master_title,
+          qc_status: audio.qc_status || 'pending',
+          qc_notes: audio.qc_notes || null,
+          created_at: audio.created_at,
+          error_message: audio.error_message
+        } : null,
+        video: video ? {
+          id: video.id,
+          status: video.status,
+          file_path: video.file_path,
+          gcs_path: video.gcs_path,
+          duration_seconds: video.duration_seconds,
+          qc_status: video.qc_status || 'pending',
+          qc_notes: video.qc_notes || null,
+          created_at: video.created_at,
+          error_message: video.error_message
+        } : null,
+        ready_for_qc: (audio?.status === 'completed') && (video?.status === 'completed'),
+        qc_complete: (audio?.qc_status === 'approved') && (video?.qc_status === 'approved')
+      };
+    });
+
+    const summary = {
+      total_languages: selectedLanguages.length,
+      audio_ready: languages.filter(l => l.audio?.status === 'completed').length,
+      video_ready: languages.filter(l => l.video?.status === 'completed').length,
+      fully_ready_for_qc: languages.filter(l => l.ready_for_qc).length,
+      fully_qc_approved: languages.filter(l => l.qc_complete).length
+    };
+
+    res.json({
+      submission_id: submissionId,
+      overall_qc_status: submission.qc_status,
+      summary,
+      languages
+    });
+  } catch (error) {
+    logger.error("[QC] Error fetching per-language status:", error);
+    res.status(500).json({ error: "Failed to fetch per-language QC status" });
+  }
+});
+
+/**
+ * POST /api/qc/approve-language/:submissionId/:languageCode
+ * Approve audio and/or video for a specific language
+ * Body: { approve_audio: true, approve_video: true, reviewer_name, notes }
+ */
+router.post("/approve-language/:submissionId/:languageCode", async (req, res) => {
+  const db = getDb();
+  const { submissionId, languageCode } = req.params;
+  const { approve_audio, approve_video, reviewer_name, notes } = req.body;
+
+  try {
+    const submission = db
+      .prepare("SELECT * FROM submissions WHERE id = ?")
+      .get(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    const results = { audio: null, video: null };
+
+    if (approve_audio) {
+      const audio = db.prepare(
+        "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?"
+      ).get(submissionId, languageCode);
+
+      if (audio) {
+        db.prepare(`
+          UPDATE generated_audio 
+          SET qc_status = 'approved', 
+              qc_notes = ?,
+              qc_reviewed_by = ?,
+              qc_reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(notes || null, reviewer_name, audio.id);
+        results.audio = 'approved';
+      }
+    }
+
+    if (approve_video) {
+      const video = db.prepare(
+        "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?"
+      ).get(submissionId, languageCode);
+
+      if (video) {
+        db.prepare(`
+          UPDATE generated_videos 
+          SET qc_status = 'approved', 
+              qc_notes = ?,
+              qc_reviewed_by = ?,
+              qc_reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(notes || null, reviewer_name, video.id);
+        results.video = 'approved';
+      }
+    }
+
+    // Check if all languages are now QC approved
+    const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
+    
+    const approvedAudioCount = db.prepare(`
+      SELECT COUNT(*) as count FROM generated_audio 
+      WHERE submission_id = ? AND qc_status = 'approved'
+    `).get(submissionId).count;
+
+    const approvedVideoCount = db.prepare(`
+      SELECT COUNT(*) as count FROM generated_videos 
+      WHERE submission_id = ? AND qc_status = 'approved'
+    `).get(submissionId).count;
+
+    const allApproved = approvedAudioCount >= selectedLanguages.length && 
+                        approvedVideoCount >= selectedLanguages.length;
+
+    // Update overall submission QC status if all languages approved
+    if (allApproved) {
+      db.prepare(`
+        UPDATE submissions 
+        SET qc_status = 'approved',
+            status = 'completed',
+            qc_reviewed_at = CURRENT_TIMESTAMP,
+            qc_reviewed_by = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(reviewer_name, submissionId);
+    }
+
+    // Log to QC history
+    db.prepare(`
+      INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      submissionId,
+      reviewer_name || 'Unknown',
+      submission.qc_status,
+      allApproved ? 'approved' : 'in_progress',
+      `Language ${languageCode}: Audio=${results.audio || 'unchanged'}, Video=${results.video || 'unchanged'}. ${notes || ''}`
+    );
+
+    res.json({
+      message: `QC updated for language ${languageCode}`,
+      submission_id: submissionId,
+      language_code: languageCode,
+      results,
+      all_languages_approved: allApproved,
+      approved_audio_count: approvedAudioCount,
+      approved_video_count: approvedVideoCount,
+      total_languages: selectedLanguages.length
+    });
+  } catch (error) {
+    logger.error(`[QC] Error approving language ${languageCode}:`, error);
+    res.status(500).json({ error: "Failed to approve language" });
+  }
+});
+
+/**
+ * POST /api/qc/reject-language/:submissionId/:languageCode
+ * Reject audio and/or video for a specific language
+ * Body: { reject_audio: true, reject_video: true, reviewer_name, rejection_reason }
+ */
+router.post("/reject-language/:submissionId/:languageCode", async (req, res) => {
+  const db = getDb();
+  const { submissionId, languageCode } = req.params;
+  const { reject_audio, reject_video, reviewer_name, rejection_reason } = req.body;
+
+  try {
+    const submission = db
+      .prepare("SELECT * FROM submissions WHERE id = ?")
+      .get(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    if (!rejection_reason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const results = { audio: null, video: null };
+
+    if (reject_audio) {
+      const audio = db.prepare(
+        "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?"
+      ).get(submissionId, languageCode);
+
+      if (audio) {
+        db.prepare(`
+          UPDATE generated_audio 
+          SET qc_status = 'rejected', 
+              qc_notes = ?,
+              qc_reviewed_by = ?,
+              qc_reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(rejection_reason, reviewer_name, audio.id);
+        results.audio = 'rejected';
+      }
+    }
+
+    if (reject_video) {
+      const video = db.prepare(
+        "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?"
+      ).get(submissionId, languageCode);
+
+      if (video) {
+        db.prepare(`
+          UPDATE generated_videos 
+          SET qc_status = 'rejected', 
+              qc_notes = ?,
+              qc_reviewed_by = ?,
+              qc_reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(rejection_reason, reviewer_name, video.id);
+        results.video = 'rejected';
+      }
+    }
+
+    // Update overall submission QC status to rejected
+    db.prepare(`
+      UPDATE submissions 
+      SET qc_status = 'rejected',
+          qc_notes = ?,
+          qc_reviewed_at = CURRENT_TIMESTAMP,
+          qc_reviewed_by = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(`Language ${languageCode} rejected: ${rejection_reason}`, reviewer_name, submissionId);
+
+    // Log to QC history
+    db.prepare(`
+      INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      submissionId,
+      reviewer_name || 'Unknown',
+      submission.qc_status,
+      'rejected',
+      `Language ${languageCode} REJECTED: Audio=${results.audio || 'unchanged'}, Video=${results.video || 'unchanged'}. Reason: ${rejection_reason}`
+    );
+
+    res.json({
+      message: `Language ${languageCode} rejected`,
+      submission_id: submissionId,
+      language_code: languageCode,
+      results,
+      rejection_reason
+    });
+  } catch (error) {
+    logger.error(`[QC] Error rejecting language ${languageCode}:`, error);
+    res.status(500).json({ error: "Failed to reject language" });
+  }
+});
+
 module.exports = router;

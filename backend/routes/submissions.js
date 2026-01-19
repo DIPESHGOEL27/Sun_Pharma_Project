@@ -1155,4 +1155,256 @@ router.get("/stats/overview", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/submissions/:id/video/:languageCode
+ * Upload/register final video for a specific language
+ * Body: { gcsPath, publicUrl, uploadedBy, duration_seconds }
+ */
+router.post(
+  "/:id/video/:languageCode",
+  [
+    param("id").isInt(),
+    param("languageCode").notEmpty().withMessage("Language code is required"),
+    body("gcsPath").notEmpty().withMessage("gcsPath is required"),
+    body("publicUrl").optional().isString(),
+    body("uploadedBy").optional().isString(),
+    body("duration_seconds").optional().isNumeric(),
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    const db = getDb();
+    const { id, languageCode } = req.params;
+    const { gcsPath, publicUrl, uploadedBy, duration_seconds } = req.body;
+
+    try {
+      // Verify submission exists
+      const submission = db
+        .prepare("SELECT * FROM submissions WHERE id = ?")
+        .get(id);
+
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      // Verify language is in submission's selected languages
+      const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
+      if (!selectedLanguages.includes(languageCode)) {
+        return res.status(400).json({ 
+          error: `Language ${languageCode} is not in submission's selected languages`,
+          selected_languages: selectedLanguages
+        });
+      }
+
+      // Get generated audio for this language (if exists)
+      const generatedAudio = db
+        .prepare("SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?")
+        .get(id, languageCode);
+
+      const finalPublicUrl = publicUrl || toPublicUrlFromGcs(gcsPath);
+
+      // Check if video already exists for this language
+      const existingVideo = db
+        .prepare("SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?")
+        .get(id, languageCode);
+
+      if (existingVideo) {
+        // Update existing video
+        db.prepare(`
+          UPDATE generated_videos 
+          SET gcs_path = ?,
+              file_path = ?,
+              duration_seconds = ?,
+              status = 'completed',
+              error_message = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(
+          gcsPath,
+          finalPublicUrl, // store public URL in file_path for backwards compatibility
+          duration_seconds || null,
+          existingVideo.id
+        );
+
+        logger.info(`[SUBMISSION] Updated video for submission ${id}, language: ${languageCode}`);
+      } else {
+        // Insert new video record
+        db.prepare(`
+          INSERT INTO generated_videos (
+            submission_id, language_code, generated_audio_id,
+            file_path, gcs_path, duration_seconds, status
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'completed')
+        `).run(
+          id,
+          languageCode,
+          generatedAudio?.id || null,
+          finalPublicUrl,
+          gcsPath,
+          duration_seconds || null
+        );
+
+        logger.info(`[SUBMISSION] Registered video for submission ${id}, language: ${languageCode}`);
+      }
+
+      // Check if all languages have videos and update submission status
+      const completedVideos = db.prepare(`
+        SELECT COUNT(DISTINCT language_code) as count 
+        FROM generated_videos 
+        WHERE submission_id = ? AND status = 'completed'
+      `).get(id);
+
+      const allVideosComplete = completedVideos.count >= selectedLanguages.length;
+
+      // Update submission status if all videos are complete
+      if (allVideosComplete) {
+        db.prepare(`
+          UPDATE submissions 
+          SET status = ?, 
+              qc_status = CASE WHEN qc_status = 'approved' THEN qc_status ELSE 'pending' END,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(SUBMISSION_STATUS.PENDING_QC, id);
+      }
+
+      res.json({
+        message: existingVideo ? "Video updated" : "Video registered",
+        submission_id: id,
+        language_code: languageCode,
+        video_url: finalPublicUrl,
+        all_videos_complete: allVideosComplete,
+        videos_completed: completedVideos.count,
+        total_languages: selectedLanguages.length
+      });
+    } catch (error) {
+      logger.error(`Error saving video for language ${languageCode}:`, error);
+      res.status(500).json({ error: "Failed to save video" });
+    }
+  }
+);
+
+/**
+ * GET /api/submissions/:id/languages
+ * Get per-language status for a submission (audio + video status for each language)
+ */
+router.get("/:id/languages", async (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+
+  try {
+    const submission = db
+      .prepare("SELECT selected_languages FROM submissions WHERE id = ?")
+      .get(id);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
+
+    // Get all generated audio for this submission
+    const generatedAudio = db.prepare(`
+      SELECT ga.*, am.title as audio_master_title, am.language_code as audio_master_language
+      FROM generated_audio ga
+      LEFT JOIN audio_masters am ON ga.audio_master_id = am.id
+      WHERE ga.submission_id = ?
+    `).all(id);
+
+    // Get all generated videos for this submission
+    const generatedVideos = db.prepare(`
+      SELECT * FROM generated_videos WHERE submission_id = ?
+    `).all(id);
+
+    // Build per-language status
+    const languageStatus = selectedLanguages.map(langCode => {
+      const audio = generatedAudio.find(a => a.language_code === langCode);
+      const video = generatedVideos.find(v => v.language_code === langCode);
+
+      return {
+        language_code: langCode,
+        audio: audio ? {
+          id: audio.id,
+          status: audio.status,
+          file_path: audio.file_path,
+          gcs_path: audio.gcs_path,
+          public_url: audio.public_url,
+          audio_master_title: audio.audio_master_title,
+          created_at: audio.created_at,
+          error_message: audio.error_message
+        } : null,
+        video: video ? {
+          id: video.id,
+          status: video.status,
+          file_path: video.file_path,
+          gcs_path: video.gcs_path,
+          duration_seconds: video.duration_seconds,
+          created_at: video.created_at,
+          error_message: video.error_message
+        } : null,
+        audio_complete: audio?.status === 'completed',
+        video_complete: video?.status === 'completed',
+        ready_for_qc: audio?.status === 'completed' && video?.status === 'completed'
+      };
+    });
+
+    const summary = {
+      total_languages: selectedLanguages.length,
+      audio_completed: languageStatus.filter(l => l.audio_complete).length,
+      videos_completed: languageStatus.filter(l => l.video_complete).length,
+      ready_for_qc: languageStatus.filter(l => l.ready_for_qc).length,
+      all_complete: languageStatus.every(l => l.ready_for_qc)
+    };
+
+    res.json({
+      submission_id: id,
+      summary,
+      languages: languageStatus
+    });
+  } catch (error) {
+    logger.error("Error fetching language status:", error);
+    res.status(500).json({ error: "Failed to fetch language status" });
+  }
+});
+
+/**
+ * DELETE /api/submissions/:id/video/:languageCode
+ * Delete a video for a specific language
+ */
+router.delete("/:id/video/:languageCode", async (req, res) => {
+  const db = getDb();
+  const { id, languageCode } = req.params;
+
+  try {
+    const video = db
+      .prepare("SELECT * FROM generated_videos WHERE submission_id = ? AND language_code = ?")
+      .get(id, languageCode);
+
+    if (!video) {
+      return res.status(404).json({ error: "Video not found for this language" });
+    }
+
+    // Delete from GCS if path exists
+    if (video.gcs_path) {
+      try {
+        await gcsService.deleteFile(video.gcs_path);
+      } catch (gcsError) {
+        logger.warn(`Failed to delete video from GCS: ${gcsError.message}`);
+      }
+    }
+
+    // Delete from database
+    db.prepare("DELETE FROM generated_videos WHERE id = ?").run(video.id);
+
+    logger.info(`[SUBMISSION] Deleted video for submission ${id}, language: ${languageCode}`);
+
+    res.json({
+      message: "Video deleted",
+      submission_id: id,
+      language_code: languageCode
+    });
+  } catch (error) {
+    logger.error(`Error deleting video for language ${languageCode}:`, error);
+    res.status(500).json({ error: "Failed to delete video" });
+  }
+});
+
 module.exports = router;

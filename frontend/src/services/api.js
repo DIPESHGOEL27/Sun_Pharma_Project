@@ -64,6 +64,12 @@ export const submissionsApi = {
     api.post("/submissions/validate-audio", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  // Per-language endpoints
+  getLanguages: (id) => api.get(`/submissions/${id}/languages`),
+  saveLanguageVideo: (id, languageCode, data) =>
+    api.post(`/submissions/${id}/video/${languageCode}`, data),
+  deleteLanguageVideo: (id, languageCode) =>
+    api.delete(`/submissions/${id}/video/${languageCode}`),
 };
 
 // Voice API
@@ -74,6 +80,11 @@ export const voiceApi = {
     api.post(`/voice/speech-to-speech/${submissionId}`),
   getStatus: (submissionId) => api.get(`/voice/status/${submissionId}`),
   process: (submissionId) => api.post(`/voice/process/${submissionId}`),
+  // Voice management endpoints
+  list: () => api.get("/voice/list"),
+  listActive: () => api.get("/voice/active"),
+  cleanup: (params = {}) => api.post("/voice/cleanup", null, { params }),
+  cleanupAll: () => api.delete("/voice/cleanup/all", { params: { confirm: 'true' } }),
 };
 
 // Audio Masters API
@@ -140,6 +151,12 @@ export const qcApi = {
     }),
   getStats: () => api.get("/qc/stats"),
   getHistory: (submissionId) => api.get(`/qc/history/${submissionId}`),
+  // Per-language QC endpoints
+  getPerLanguage: (submissionId) => api.get(`/qc/per-language/${submissionId}`),
+  approveLanguage: (submissionId, languageCode, data) =>
+    api.post(`/qc/approve-language/${submissionId}/${languageCode}`, data),
+  rejectLanguage: (submissionId, languageCode, data) =>
+    api.post(`/qc/reject-language/${submissionId}/${languageCode}`, data),
 };
 
 // Admin API
@@ -170,6 +187,9 @@ export const adminApi = {
     api.get("/admin/mr-grouped-data", { params }),
   getMetrics: (params = {}) => api.get("/admin/metrics", { params }),
   syncSheets: () => api.post("/admin/sync-sheets"),
+  // Per-language stats and voice management
+  getPerLanguageStats: () => api.get("/admin/per-language-stats"),
+  getVoiceManagement: () => api.get("/admin/voice-management"),
 };
 
 // Storage API - GCS Direct Upload

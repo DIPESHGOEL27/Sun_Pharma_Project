@@ -654,7 +654,8 @@ export default function SubmissionDetails() {
 
         {/* Right Column - Actions & Files */}
         <div className="space-y-6">
-          {/* Quick Actions */}
+          {/* Quick Actions - Hidden for viewers */}
+          {adminRole !== "viewer" && (
           <div className="card">
             <h3 className="font-semibold text-gray-900 mb-4">Actions</h3>
             <div className="space-y-3">
@@ -719,6 +720,7 @@ export default function SubmissionDetails() {
               )}
             </div>
           </div>
+          )}
 
           {/* Image Preview */}
           <div className="card">

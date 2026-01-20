@@ -89,8 +89,8 @@ export default function AdminDashboard() {
     const storedRole = sessionStorage.getItem("adminRole");
     if (adminLoggedIn === "true") {
       setIsLoggedIn(true);
-      // Redirect editors directly to submissions page
-      if (storedRole === "editor") {
+      // Redirect editors and viewers directly to submissions page
+      if (storedRole === "editor" || storedRole === "viewer") {
         navigate("/admin/submissions", { replace: true });
       }
     }
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
         setUserRole(role);
         sessionStorage.setItem("adminRole", role);
 
-        // Redirect editors directly to submissions page
+        // Redirect editors and viewers directly to submissions page
         if (role === "editor") {
           navigate("/admin/submissions", { replace: true });
         }
@@ -257,11 +257,8 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500 flex items-center gap-2">
+          <p className="text-gray-500">
             Manage and monitor video submissions
-            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 uppercase">
-              {userRole}
-            </span>
           </p>
         </div>
         <div className="flex items-center gap-3">

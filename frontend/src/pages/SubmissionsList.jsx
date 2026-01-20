@@ -149,7 +149,7 @@ export default function SubmissionsList() {
           <Link to="/submit" target="_blank" className="btn-primary">
             + New Submission
           </Link>
-          {adminRole === "editor" && (
+          {(adminRole === "editor" || adminRole === "viewer") && (
             <button
               onClick={handleLogout}
               className="btn btn-outline flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"

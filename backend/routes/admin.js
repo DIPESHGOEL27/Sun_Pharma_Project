@@ -1335,11 +1335,10 @@ router.get("/per-language-stats", async (req, res) => {
       SELECT 
         ga.language_code,
         COUNT(*) as total,
-        COUNT(CASE WHEN s.qc_status = 'approved' THEN 1 END) as approved,
-        COUNT(CASE WHEN s.qc_status = 'rejected' THEN 1 END) as rejected,
-        COUNT(CASE WHEN s.qc_status = 'pending' THEN 1 END) as pending
+        COUNT(CASE WHEN ga.qc_status = 'approved' THEN 1 END) as approved,
+        COUNT(CASE WHEN ga.qc_status = 'rejected' THEN 1 END) as rejected,
+        COUNT(CASE WHEN ga.qc_status IS NULL OR ga.qc_status = 'pending' THEN 1 END) as pending
       FROM generated_audio ga
-      JOIN submissions s ON ga.submission_id = s.id
       WHERE ga.status = 'completed'
       GROUP BY ga.language_code
       ORDER BY total DESC

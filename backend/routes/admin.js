@@ -1351,7 +1351,7 @@ router.get("/per-language-stats", async (req, res) => {
       SELECT COUNT(*) as count FROM submissions s
       WHERE NOT EXISTS (
         SELECT 1 FROM (
-          SELECT value as lang FROM submissions, json_each(selected_languages) WHERE id = s.id
+          SELECT value as lang FROM json_each(s.selected_languages)
         ) langs
         WHERE NOT EXISTS (
           SELECT 1 FROM generated_audio ga 

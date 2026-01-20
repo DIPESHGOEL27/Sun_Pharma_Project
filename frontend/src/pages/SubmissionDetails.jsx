@@ -37,7 +37,9 @@ export default function SubmissionDetails() {
   const [editorNotes, setEditorNotes] = useState("");
   const [languageStatus, setLanguageStatus] = useState(null);
   const [perLanguageVideoFiles, setPerLanguageVideoFiles] = useState({});
-  const [perLanguageUploadProgress, setPerLanguageUploadProgress] = useState({});
+  const [perLanguageUploadProgress, setPerLanguageUploadProgress] = useState(
+    {},
+  );
 
   useEffect(() => {
     loadSubmission();
@@ -79,7 +81,7 @@ export default function SubmissionDetails() {
       loadSubmission();
     } catch (error) {
       toast.error(
-        error.response?.data?.error || "Failed to send consent email"
+        error.response?.data?.error || "Failed to send consent email",
       );
     } finally {
       setActionLoading("");
@@ -94,7 +96,7 @@ export default function SubmissionDetails() {
       loadSubmission();
     } catch (error) {
       toast.error(
-        error.response?.data?.error || "Failed to start voice cloning"
+        error.response?.data?.error || "Failed to start voice cloning",
       );
     } finally {
       setActionLoading("");
@@ -109,7 +111,7 @@ export default function SubmissionDetails() {
       loadSubmission();
     } catch (error) {
       toast.error(
-        error.response?.data?.error || "Failed to process voice pipeline"
+        error.response?.data?.error || "Failed to process voice pipeline",
       );
     } finally {
       setActionLoading("");
@@ -156,7 +158,7 @@ export default function SubmissionDetails() {
     try {
       const { data } = await storageApi.getFinalVideoUploadUrl(
         submission.id,
-        finalVideoFile
+        finalVideoFile,
       );
 
       await storageApi.uploadToGCS(
@@ -164,7 +166,7 @@ export default function SubmissionDetails() {
         finalVideoFile,
         (percent) => {
           setFinalUploadProgress(percent);
-        }
+        },
       );
 
       await submissionsApi.saveFinalVideo(submission.id, {
@@ -180,7 +182,7 @@ export default function SubmissionDetails() {
       loadSubmission();
     } catch (error) {
       toast.error(
-        error.response?.data?.error || "Failed to upload final video"
+        error.response?.data?.error || "Failed to upload final video",
       );
     } finally {
       setActionLoading("");
@@ -204,7 +206,7 @@ export default function SubmissionDetails() {
           submission.id,
           adminRole,
           ["Re-upload final video"],
-          editorNotes || "Re-upload final video"
+          editorNotes || "Re-upload final video",
         );
         toast.success("Re-upload requested");
       } else if (editorAction === "regenerate") {
@@ -212,7 +214,7 @@ export default function SubmissionDetails() {
           submission.id,
           adminRole,
           ["Regenerate final video"],
-          editorNotes || "Regenerate final video"
+          editorNotes || "Regenerate final video",
         );
         toast.success("Regeneration requested");
       }
@@ -222,7 +224,7 @@ export default function SubmissionDetails() {
       loadSubmission();
     } catch (error) {
       toast.error(
-        error.response?.data?.error || "Failed to update submission status"
+        error.response?.data?.error || "Failed to update submission status",
       );
     } finally {
       setActionLoading("");
@@ -233,12 +235,14 @@ export default function SubmissionDetails() {
   const handleLanguageVideoUpload = async (languageCode) => {
     const file = perLanguageVideoFiles[languageCode];
     if (!file) {
-      toast.error(`Please select a video file for ${languageCode.toUpperCase()}`);
+      toast.error(
+        `Please select a video file for ${languageCode.toUpperCase()}`,
+      );
       return;
     }
 
     setActionLoading(`upload-${languageCode}`);
-    setPerLanguageUploadProgress(prev => ({ ...prev, [languageCode]: 0 }));
+    setPerLanguageUploadProgress((prev) => ({ ...prev, [languageCode]: 0 }));
 
     try {
       // Get signed URL for upload
@@ -246,12 +250,15 @@ export default function SubmissionDetails() {
         file.name,
         file.type,
         "GENERATED_VIDEOS",
-        `${submission.id}/${languageCode}`
+        `${submission.id}/${languageCode}`,
       );
 
       // Upload to GCS
       await storageApi.uploadToGCS(data.uploadUrl, file, (percent) => {
-        setPerLanguageUploadProgress(prev => ({ ...prev, [languageCode]: percent }));
+        setPerLanguageUploadProgress((prev) => ({
+          ...prev,
+          [languageCode]: percent,
+        }));
       });
 
       // Register the video in the backend
@@ -263,13 +270,14 @@ export default function SubmissionDetails() {
       });
 
       toast.success(`Video uploaded for ${languageCode.toUpperCase()}`);
-      setPerLanguageVideoFiles(prev => ({ ...prev, [languageCode]: null }));
-      setPerLanguageUploadProgress(prev => ({ ...prev, [languageCode]: 0 }));
+      setPerLanguageVideoFiles((prev) => ({ ...prev, [languageCode]: null }));
+      setPerLanguageUploadProgress((prev) => ({ ...prev, [languageCode]: 0 }));
       loadSubmission();
       loadLanguageStatus();
     } catch (error) {
       toast.error(
-        error.response?.data?.error || `Failed to upload video for ${languageCode}`
+        error.response?.data?.error ||
+          `Failed to upload video for ${languageCode}`,
       );
     } finally {
       setActionLoading("");
@@ -277,7 +285,11 @@ export default function SubmissionDetails() {
   };
 
   // Per-language QC approve handler
-  const handleApproveLanguage = async (languageCode, approveAudio, approveVideo) => {
+  const handleApproveLanguage = async (
+    languageCode,
+    approveAudio,
+    approveVideo,
+  ) => {
     setActionLoading(`approve-${languageCode}`);
     try {
       await qcApi.approveLanguage(submission.id, languageCode, {
@@ -297,7 +309,12 @@ export default function SubmissionDetails() {
   };
 
   // Per-language QC reject handler
-  const handleRejectLanguage = async (languageCode, rejectAudio, rejectVideo, reason) => {
+  const handleRejectLanguage = async (
+    languageCode,
+    rejectAudio,
+    rejectVideo,
+    reason,
+  ) => {
     if (!reason) {
       toast.error("Please provide a rejection reason");
       return;
@@ -392,8 +409,8 @@ export default function SubmissionDetails() {
               submission.consent_status === "verified"
                 ? "completed"
                 : submission.consent_status === "otp_sent"
-                ? "in_progress"
-                : "pending"
+                  ? "in_progress"
+                  : "pending"
             }
             icon={CheckCircleIcon}
           />
@@ -407,21 +424,21 @@ export default function SubmissionDetails() {
               submission.generated_audio?.some((a) => a.status === "completed")
                 ? "completed"
                 : submission.voice_clone_status === "completed"
-                ? "completed"
-                : submission.voice_clone_status === "in_progress" ||
-                  submission.generated_audio?.some(
-                    (a) => a.status === "processing"
-                  )
-                ? "in_progress"
-                : submission.voice_clone_status === "failed"
-                ? "failed"
-                : "pending"
+                  ? "completed"
+                  : submission.voice_clone_status === "in_progress" ||
+                      submission.generated_audio?.some(
+                        (a) => a.status === "processing",
+                      )
+                    ? "in_progress"
+                    : submission.voice_clone_status === "failed"
+                      ? "failed"
+                      : "pending"
             }
             icon={MicrophoneIcon}
           />
           <PipelineConnector
             active={submission.generated_audio?.some(
-              (a) => a.status === "completed"
+              (a) => a.status === "completed",
             )}
           />
           <PipelineStep
@@ -430,10 +447,10 @@ export default function SubmissionDetails() {
               submission.final_video_url
                 ? "completed"
                 : submission.generated_audio?.some(
-                    (a) => a.status === "completed"
-                  )
-                ? "in_progress"
-                : "pending"
+                      (a) => a.status === "completed",
+                    )
+                  ? "in_progress"
+                  : "pending"
             }
             icon={VideoCameraIcon}
           />
@@ -444,10 +461,10 @@ export default function SubmissionDetails() {
               submission.qc_status === "approved"
                 ? "completed"
                 : submission.qc_status === "in_review"
-                ? "in_progress"
-                : submission.qc_status === "rejected"
-                ? "failed"
-                : "pending"
+                  ? "in_progress"
+                  : submission.qc_status === "rejected"
+                    ? "failed"
+                    : "pending"
             }
             icon={ClockIcon}
           />
@@ -502,23 +519,31 @@ export default function SubmissionDetails() {
                 <GlobeAltIcon className="w-5 h-5" />
                 Per-Language Status
               </h3>
-              
+
               {/* Summary */}
               <div className="grid grid-cols-4 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{languageStatus.summary?.total_languages || 0}</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {languageStatus.summary?.total_languages || 0}
+                  </div>
                   <div className="text-xs text-gray-500">Total Languages</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{languageStatus.summary?.audio_completed || 0}</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {languageStatus.summary?.audio_completed || 0}
+                  </div>
                   <div className="text-xs text-gray-500">Audio Ready</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{languageStatus.summary?.videos_completed || 0}</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {languageStatus.summary?.videos_completed || 0}
+                  </div>
                   <div className="text-xs text-gray-500">Videos Ready</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-emerald-600">{languageStatus.summary?.ready_for_qc || 0}</div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    {languageStatus.summary?.ready_for_qc || 0}
+                  </div>
                   <div className="text-xs text-gray-500">Ready for QC</div>
                 </div>
               </div>
@@ -566,7 +591,7 @@ export default function SubmissionDetails() {
                           <div className="text-sm text-gray-500">
                             {Math.floor(audio.duration_seconds / 60)}:
                             {String(
-                              Math.floor(audio.duration_seconds % 60)
+                              Math.floor(audio.duration_seconds % 60),
                             ).padStart(2, "0")}
                           </div>
                         )}
@@ -1041,14 +1066,16 @@ function LanguageStatusCard({
   const videoComplete = lang.video_complete;
   const readyForQC = lang.ready_for_qc;
 
-  const audioQcStatus = lang.audio?.qc_status || 'pending';
-  const videoQcStatus = lang.video?.qc_status || 'pending';
+  const audioQcStatus = lang.audio?.qc_status || "pending";
+  const videoQcStatus = lang.video?.qc_status || "pending";
 
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-lg">{langCode.toUpperCase()}</span>
+          <span className="font-semibold text-lg">
+            {langCode.toUpperCase()}
+          </span>
           {readyForQC && (
             <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
               Ready for QC
@@ -1071,7 +1098,7 @@ function LanguageStatusCard({
           {lang.audio ? (
             <div className="space-y-1">
               <AudioStatusBadge status={lang.audio.status} />
-              {lang.audio.public_url && lang.audio.status === 'completed' && (
+              {lang.audio.public_url && lang.audio.status === "completed" && (
                 <a
                   href={lang.audio.public_url}
                   target="_blank"
@@ -1096,7 +1123,7 @@ function LanguageStatusCard({
           {lang.video ? (
             <div className="space-y-1">
               <AudioStatusBadge status={lang.video.status} />
-              {lang.video.gcs_path && lang.video.status === 'completed' && (
+              {lang.video.gcs_path && lang.video.status === "completed" && (
                 <a
                   href={lang.video.file_path || lang.video.gcs_path}
                   target="_blank"
@@ -1114,37 +1141,44 @@ function LanguageStatusCard({
       </div>
 
       {/* Editor: Video Upload */}
-      {adminRole === 'editor' && audioComplete && (
+      {adminRole === "editor" && audioComplete && (
         <div className="border-t pt-3 mt-3">
-          <div className="text-sm font-medium mb-2">Upload Video for {langCode.toUpperCase()}</div>
+          <div className="text-sm font-medium mb-2">
+            Upload Video for {langCode.toUpperCase()}
+          </div>
           <div className="flex items-center gap-2">
             <input
               type="file"
               accept="video/*"
-              onChange={(e) => setPerLanguageVideoFiles(prev => ({
-                ...prev,
-                [langCode]: e.target.files?.[0] || null
-              }))}
+              onChange={(e) =>
+                setPerLanguageVideoFiles((prev) => ({
+                  ...prev,
+                  [langCode]: e.target.files?.[0] || null,
+                }))
+              }
               className="text-xs flex-1"
             />
             <button
               onClick={() => onUpload(langCode)}
-              disabled={!perLanguageVideoFiles[langCode] || actionLoading === `upload-${langCode}`}
+              disabled={
+                !perLanguageVideoFiles[langCode] ||
+                actionLoading === `upload-${langCode}`
+              }
               className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
             >
-              {actionLoading === `upload-${langCode}` 
-                ? `${perLanguageUploadProgress[langCode] || 0}%` 
-                : 'Upload'}
+              {actionLoading === `upload-${langCode}`
+                ? `${perLanguageUploadProgress[langCode] || 0}%`
+                : "Upload"}
             </button>
           </div>
         </div>
       )}
 
       {/* Admin: QC Actions */}
-      {adminRole === 'admin' && readyForQC && (
+      {adminRole === "admin" && readyForQC && (
         <div className="border-t pt-3 mt-3">
           <div className="text-sm font-medium mb-2">QC Actions</div>
-          
+
           {!showRejectForm ? (
             <div className="flex items-center gap-2">
               <button
@@ -1153,7 +1187,9 @@ function LanguageStatusCard({
                 className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
               >
                 <CheckCircleIcon className="w-4 h-4" />
-                {actionLoading === `approve-${langCode}` ? 'Approving...' : 'Approve Both'}
+                {actionLoading === `approve-${langCode}`
+                  ? "Approving..."
+                  : "Approve Both"}
               </button>
               <button
                 onClick={() => setShowRejectForm(true)}
@@ -1178,10 +1214,14 @@ function LanguageStatusCard({
                     setShowRejectForm(false);
                     setRejectReason("");
                   }}
-                  disabled={!rejectReason || actionLoading === `reject-${langCode}`}
+                  disabled={
+                    !rejectReason || actionLoading === `reject-${langCode}`
+                  }
                   className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
-                  {actionLoading === `reject-${langCode}` ? 'Rejecting...' : 'Confirm Reject'}
+                  {actionLoading === `reject-${langCode}`
+                    ? "Rejecting..."
+                    : "Confirm Reject"}
                 </button>
                 <button
                   onClick={() => {
@@ -1209,7 +1249,9 @@ function QcStatusBadge({ status, label }) {
   };
   const c = config[status] || config.pending;
   return (
-    <span className={`px-2 py-0.5 text-xs font-medium rounded ${c.bg} ${c.text}`}>
+    <span
+      className={`px-2 py-0.5 text-xs font-medium rounded ${c.bg} ${c.text}`}
+    >
       {label}: {status}
     </span>
   );

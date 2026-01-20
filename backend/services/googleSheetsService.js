@@ -35,17 +35,17 @@ const GCS_BUCKET = "sunpharma-video-uploads-sage-shard-448708-v9";
  * Handles: gs:// URIs, local paths, and already-formed URLs
  */
 function toPublicUrl(pathOrUri) {
-  if (!pathOrUri || typeof pathOrUri !== 'string') return '';
-  
+  if (!pathOrUri || typeof pathOrUri !== "string") return "";
+
   const trimmed = pathOrUri.trim();
-  
+
   // Already a public HTTPS URL
-  if (trimmed.startsWith('https://storage.googleapis.com/')) {
+  if (trimmed.startsWith("https://storage.googleapis.com/")) {
     return trimmed;
   }
-  
+
   // GCS URI format: gs://bucket-name/path/to/file
-  if (trimmed.startsWith('gs://')) {
+  if (trimmed.startsWith("gs://")) {
     // Extract bucket and path from gs://bucket/path
     const match = trimmed.match(/^gs:\/\/([^\/]+)\/(.+)$/);
     if (match) {
@@ -54,20 +54,20 @@ function toPublicUrl(pathOrUri) {
       return `https://storage.googleapis.com/${bucket}/${objectPath}`;
     }
   }
-  
+
   // Local file path format: /app/uploads/audio/...
   // These are local container paths - cannot convert to public URL
   // Return as-is (or could return empty if we want to hide local paths)
-  if (trimmed.startsWith('/app/uploads/')) {
+  if (trimmed.startsWith("/app/uploads/")) {
     // Return the local path as-is since these files aren't on GCS
     return trimmed;
   }
-  
+
   // If it's a relative path that looks like a GCS object path
-  if (trimmed.startsWith('submissions/') || trimmed.startsWith('audio/')) {
+  if (trimmed.startsWith("submissions/") || trimmed.startsWith("audio/")) {
     return `https://storage.googleapis.com/${GCS_BUCKET}/${trimmed}`;
   }
-  
+
   // Return as-is for other formats
   return trimmed;
 }
@@ -106,28 +106,28 @@ async function initSheetsClient() {
  */
 function getHeaders() {
   return [
-    "ID",                           // A: Entry ID (submissionId-langCode)
-    "Video Language",               // B: Language name
-    "Campaign Name",                // C: Campaign
-    "MR Code",                      // D: MR Code
-    "MR Name",                      // E: MR Name
-    "MR Mobile no.",                // F: MR Mobile
-    "Dr. Full Name",                // G: Doctor Name
-    "Dr. Email",                    // H: Doctor Email
-    "Dr. Mobile no.",               // I: Doctor Phone
-    "Dr. Specialty",                // J: Specialty
-    "Dr. Clinic/Hospital Name",     // K: Clinic Name
-    "Doctor's City",                // L: City
-    "Doctor's State",               // M: State
-    "Doctor Photo Link",            // N: Image URL
-    "Doctor Voice Samples Links",   // O: Audio URL
-    "Final video link",             // P: Generated Video URL
-    "Video Generated on",           // Q: Video generated timestamp
-    "Status",                       // R: QC Status (Approved/Rejected/Regenerate)
+    "ID", // A: Entry ID (submissionId-langCode)
+    "Video Language", // B: Language name
+    "Campaign Name", // C: Campaign
+    "MR Code", // D: MR Code
+    "MR Name", // E: MR Name
+    "MR Mobile no.", // F: MR Mobile
+    "Dr. Full Name", // G: Doctor Name
+    "Dr. Email", // H: Doctor Email
+    "Dr. Mobile no.", // I: Doctor Phone
+    "Dr. Specialty", // J: Specialty
+    "Dr. Clinic/Hospital Name", // K: Clinic Name
+    "Doctor's City", // L: City
+    "Doctor's State", // M: State
+    "Doctor Photo Link", // N: Image URL
+    "Doctor Voice Samples Links", // O: Audio URL
+    "Final video link", // P: Generated Video URL
+    "Video Generated on", // Q: Video generated timestamp
+    "Status", // R: QC Status (Approved/Rejected/Regenerate)
     "Reason for rejection / re-upload", // S: QC Notes/Rejection reason
-    "Hindi Pronunciation",          // T: Hindi pronunciation notes
-    "Regenerated?",                 // U: Whether regenerated
-    "Comments",                     // V: Additional comments
+    "Hindi Pronunciation", // T: Hindi pronunciation notes
+    "Regenerated?", // U: Whether regenerated
+    "Comments", // V: Additional comments
   ];
 }
 
@@ -148,9 +148,10 @@ async function initializeSheet() {
     const requiredHeaders = getHeaders();
 
     // Check if headers need to be set
-    const needsUpdate = !existingHeaders || 
-                        existingHeaders.length === 0 || 
-                        existingHeaders[0] !== "ID";
+    const needsUpdate =
+      !existingHeaders ||
+      existingHeaders.length === 0 ||
+      existingHeaders[0] !== "ID";
 
     if (needsUpdate) {
       // Set headers (don't clear - preserve existing data)
@@ -225,7 +226,10 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
   let qcStatusText = "";
   if (video?.qc_status === "approved" || audio?.qc_status === "approved") {
     qcStatusText = "Approved";
-  } else if (video?.qc_status === "rejected" || audio?.qc_status === "rejected") {
+  } else if (
+    video?.qc_status === "rejected" ||
+    audio?.qc_status === "rejected"
+  ) {
     qcStatusText = "Rejected";
   } else if (video?.status === "completed" || audio?.status === "completed") {
     qcStatusText = ""; // Pending QC
@@ -242,28 +246,38 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
         // Extract GCS paths or public URLs from array items and convert to public URLs
         voiceSamplesLinks = audioArray
           .slice(0, 5) // Max 5 samples
-          .map(item => {
-            let rawPath = '';
-            if (typeof item === 'string') {
+          .map((item) => {
+            let rawPath = "";
+            if (typeof item === "string") {
               rawPath = item;
             } else {
-              rawPath = item.publicUrl || item.public_url || item.gcsPath || item.gcs_path || '';
+              rawPath =
+                item.publicUrl ||
+                item.public_url ||
+                item.gcsPath ||
+                item.gcs_path ||
+                "";
             }
             return toPublicUrl(rawPath);
           })
-          .filter(url => url)
+          .filter((url) => url)
           .join(", ");
-      } else if (typeof audioArray === 'object') {
-        const rawPath = audioArray.publicUrl || audioArray.public_url || audioArray.gcsPath || audioArray.gcs_path || '';
+      } else if (typeof audioArray === "object") {
+        const rawPath =
+          audioArray.publicUrl ||
+          audioArray.public_url ||
+          audioArray.gcsPath ||
+          audioArray.gcs_path ||
+          "";
         voiceSamplesLinks = toPublicUrl(rawPath);
       }
     } catch (e) {
       // Not JSON - might be comma-separated paths or single path
       // Split by comma and convert each to public URL
       voiceSamplesLinks = audioPathSource
-        .split(',')
-        .map(p => toPublicUrl(p.trim()))
-        .filter(url => url)
+        .split(",")
+        .map((p) => toPublicUrl(p.trim()))
+        .filter((url) => url)
         .slice(0, 5)
         .join(", ");
     }
@@ -277,31 +291,33 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
   const mrMobile = submission.mr_mobile || submission.mr_phone || "";
 
   // Convert image path to public URL
-  const imageUrl = toPublicUrl(submission.image_public_url || submission.image_gcs_path || "");
+  const imageUrl = toPublicUrl(
+    submission.image_public_url || submission.image_gcs_path || "",
+  );
 
   return [
-    entryId,                                                    // A: ID
-    languageName,                                               // B: Video Language
-    submission.campaign_name || "sunpharma",                    // C: Campaign Name
-    submission.mr_code || "",                                   // D: MR Code
-    submission.mr_name || "",                                   // E: MR Name
-    mrMobile,                                                   // F: MR Mobile no.
-    submission.doctor_name || "",                               // G: Dr. Full Name
-    submission.doctor_email || "",                              // H: Dr. Email
-    submission.doctor_phone || "",                              // I: Dr. Mobile no.
-    submission.doctor_specialization || "",                     // J: Dr. Specialty
-    submission.doctor_clinic_name || "",                        // K: Dr. Clinic/Hospital Name
-    submission.doctor_city || "",                               // L: Doctor's City
-    submission.doctor_state || "",                              // M: Doctor's State
-    imageUrl,                                                   // N: Doctor Photo Link
-    voiceSamplesLinks,                                          // O: Doctor Voice Samples Links
-    videoUrl,                                                   // P: Final video link
-    videoGeneratedOn,                                           // Q: Video Generated on
-    qcStatusText,                                               // R: Status
-    video?.qc_notes || audio?.qc_notes || "",                   // S: Reason for rejection / re-upload
-    "",                                                         // T: Hindi Pronunciation
-    "",                                                         // U: Regenerated?
-    "",                                                         // V: Comments
+    entryId, // A: ID
+    languageName, // B: Video Language
+    submission.campaign_name || "sunpharma", // C: Campaign Name
+    submission.mr_code || "", // D: MR Code
+    submission.mr_name || "", // E: MR Name
+    mrMobile, // F: MR Mobile no.
+    submission.doctor_name || "", // G: Dr. Full Name
+    submission.doctor_email || "", // H: Dr. Email
+    submission.doctor_phone || "", // I: Dr. Mobile no.
+    submission.doctor_specialization || "", // J: Dr. Specialty
+    submission.doctor_clinic_name || "", // K: Dr. Clinic/Hospital Name
+    submission.doctor_city || "", // L: Doctor's City
+    submission.doctor_state || "", // M: Doctor's State
+    imageUrl, // N: Doctor Photo Link
+    voiceSamplesLinks, // O: Doctor Voice Samples Links
+    videoUrl, // P: Final video link
+    videoGeneratedOn, // Q: Video Generated on
+    qcStatusText, // R: Status
+    video?.qc_notes || audio?.qc_notes || "", // S: Reason for rejection / re-upload
+    "", // T: Hindi Pronunciation
+    "", // U: Regenerated?
+    "", // V: Comments
   ];
 }
 
@@ -347,7 +363,9 @@ async function syncSubmission(submission, options = {}) {
     }
 
     if (languages.length === 0) {
-      logger.warn(`[SHEETS] Submission ${submission.id} has no languages selected`);
+      logger.warn(
+        `[SHEETS] Submission ${submission.id} has no languages selected`,
+      );
       return false;
     }
 
@@ -358,7 +376,10 @@ async function syncSubmission(submission, options = {}) {
       const entryId = `${submission.id}-${langCode}`;
       const video = videos.find((v) => v.language_code === langCode);
       const audio = audios.find((a) => a.language_code === langCode);
-      const rowData = formatSubmissionLanguageRow(submission, langCode, { video, audio });
+      const rowData = formatSubmissionLanguageRow(submission, langCode, {
+        video,
+        audio,
+      });
 
       const existingRow = await findEntryRow(entryId);
 
@@ -372,7 +393,9 @@ async function syncSubmission(submission, options = {}) {
             values: [rowData],
           },
         });
-        logger.info(`[SHEETS] Updated entry ${entryId} in sheet (row ${existingRow})`);
+        logger.info(
+          `[SHEETS] Updated entry ${entryId} in sheet (row ${existingRow})`,
+        );
       } else {
         // Append new row
         await client.spreadsheets.values.append({
@@ -423,7 +446,9 @@ async function syncAllSubmissions(getSubmissions, getVideos, getAudios) {
       for (const langCode of languages) {
         const video = videos.find((v) => v.language_code === langCode);
         const audio = audios.find((a) => a.language_code === langCode);
-        rows.push(formatSubmissionLanguageRow(submission, langCode, { video, audio }));
+        rows.push(
+          formatSubmissionLanguageRow(submission, langCode, { video, audio }),
+        );
         totalEntries++;
       }
     }
@@ -471,7 +496,9 @@ async function syncAllSubmissions(getSubmissions, getVideos, getAudios) {
       },
     });
 
-    logger.info(`[SHEETS] Synced ${totalEntries} entries (from ${submissions.length} submissions) to sheet`);
+    logger.info(
+      `[SHEETS] Synced ${totalEntries} entries (from ${submissions.length} submissions) to sheet`,
+    );
     return true;
   } catch (error) {
     logger.error("[SHEETS] Failed to sync all submissions:", error);
@@ -507,7 +534,10 @@ async function updateVideoUrl(submissionId, languageCode, videoUrl) {
     logger.info(`[SHEETS] Updated video URL for entry ${entryId}`);
     return true;
   } catch (error) {
-    logger.error(`[SHEETS] Failed to update video URL for ${submissionId}-${languageCode}:`, error);
+    logger.error(
+      `[SHEETS] Failed to update video URL for ${submissionId}-${languageCode}:`,
+      error,
+    );
     return false;
   }
 }
@@ -536,20 +566,27 @@ async function updateQCStatusForLanguage(submissionId, languageCode, qcData) {
       range: `${SHEET_NAME}!R${existingRow}:V${existingRow}`,
       valueInputOption: "RAW",
       resource: {
-        values: [[
-          qcData.status || "",
-          qcData.reason || "",
-          qcData.hindiPronunciation || "",
-          qcData.regenerated || "",
-          qcData.comments || "",
-        ]],
+        values: [
+          [
+            qcData.status || "",
+            qcData.reason || "",
+            qcData.hindiPronunciation || "",
+            qcData.regenerated || "",
+            qcData.comments || "",
+          ],
+        ],
       },
     });
 
-    logger.info(`[SHEETS] Updated QC status for entry ${entryId} to ${qcData.status}`);
+    logger.info(
+      `[SHEETS] Updated QC status for entry ${entryId} to ${qcData.status}`,
+    );
     return true;
   } catch (error) {
-    logger.error(`[SHEETS] Failed to update QC for ${submissionId}-${languageCode}:`, error);
+    logger.error(
+      `[SHEETS] Failed to update QC for ${submissionId}-${languageCode}:`,
+      error,
+    );
     return false;
   }
 }
@@ -582,8 +619,12 @@ async function updateQCStatus(submissionId, qcData, languages = null) {
     }
 
     // Map internal status to sheet status
-    const sheetStatus = qcData.status === "approved" ? "Approved" : 
-                        qcData.status === "rejected" ? "Rejected" : "";
+    const sheetStatus =
+      qcData.status === "approved"
+        ? "Approved"
+        : qcData.status === "rejected"
+          ? "Rejected"
+          : "";
 
     // Update each language entry
     for (const langCode of languages) {
@@ -596,7 +637,10 @@ async function updateQCStatus(submissionId, qcData, languages = null) {
 
     return true;
   } catch (error) {
-    logger.error(`[SHEETS] Failed to update QC status for submission ${submissionId}:`, error);
+    logger.error(
+      `[SHEETS] Failed to update QC status for submission ${submissionId}:`,
+      error,
+    );
     return false;
   }
 }

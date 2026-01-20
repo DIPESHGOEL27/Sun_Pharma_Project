@@ -99,7 +99,7 @@ router.get("/pending", async (req, res) => {
         sortField === "doctor_name" ? "d.full_name" : "s." + sortField
       } ${sortOrder}
       LIMIT ? OFFSET ?
-    `
+    `,
       )
       .all(parseInt(limit), parseInt(offset));
 
@@ -108,7 +108,7 @@ router.get("/pending", async (req, res) => {
         `
       SELECT COUNT(*) as total FROM submissions 
       WHERE qc_status = 'pending' OR qc_status = 'in_review'
-    `
+    `,
       )
       .get();
 
@@ -164,7 +164,7 @@ router.get("/submission/:id", async (req, res) => {
       LEFT JOIN doctors d ON s.doctor_id = d.id
       LEFT JOIN medical_reps m ON s.mr_id = m.id
       WHERE s.id = ?
-    `
+    `,
       )
       .get(id);
 
@@ -179,7 +179,7 @@ router.get("/submission/:id", async (req, res) => {
       SELECT * FROM image_validations 
       WHERE submission_id = ? 
       ORDER BY validated_at DESC LIMIT 1
-    `
+    `,
       )
       .get(id);
 
@@ -189,7 +189,7 @@ router.get("/submission/:id", async (req, res) => {
       SELECT * FROM audio_validations 
       WHERE submission_id = ? 
       ORDER BY validated_at DESC LIMIT 1
-    `
+    `,
       )
       .get(id);
 
@@ -198,7 +198,7 @@ router.get("/submission/:id", async (req, res) => {
       .prepare(
         `
       SELECT * FROM generated_audio WHERE submission_id = ?
-    `
+    `,
       )
       .all(id);
 
@@ -206,7 +206,7 @@ router.get("/submission/:id", async (req, res) => {
       .prepare(
         `
       SELECT * FROM generated_videos WHERE submission_id = ?
-    `
+    `,
       )
       .all(id);
 
@@ -217,7 +217,7 @@ router.get("/submission/:id", async (req, res) => {
       SELECT * FROM qc_history 
       WHERE submission_id = ? 
       ORDER BY created_at DESC
-    `
+    `,
       )
       .all(id);
 
@@ -292,7 +292,7 @@ router.post(
         UPDATE submissions 
         SET qc_status = ?, qc_reviewed_by = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `
+      `,
       ).run(QC_STATUS.IN_REVIEW, reviewer_name, id);
 
       // Log to history
@@ -300,17 +300,17 @@ router.post(
         `
         INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         id,
         reviewer_name,
         submission.qc_status,
         QC_STATUS.IN_REVIEW,
-        "Started review"
+        "Started review",
       );
 
       logger.info(
-        `[QC] Review started for submission ${id} by ${reviewer_name}`
+        `[QC] Review started for submission ${id} by ${reviewer_name}`,
       );
 
       res.json({
@@ -322,7 +322,7 @@ router.post(
       logger.error("[QC] Error starting review:", error);
       res.status(500).json({ error: "Failed to start review" });
     }
-  }
+  },
 );
 
 /**
@@ -365,13 +365,13 @@ router.post(
             status = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `
+      `,
       ).run(
         QC_STATUS.APPROVED,
         notes,
         reviewer_name,
         SUBMISSION_STATUS.QC_APPROVED,
-        id
+        id,
       );
 
       // Log to history
@@ -379,13 +379,13 @@ router.post(
         `
         INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         id,
         reviewer_name,
         submission.qc_status,
         QC_STATUS.APPROVED,
-        notes || "Approved"
+        notes || "Approved",
       );
 
       // Audit log
@@ -393,13 +393,13 @@ router.post(
         `
         INSERT INTO audit_log (entity_type, entity_id, action, actor, details)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         "submission",
         id,
         "qc_approved",
         reviewer_name,
-        JSON.stringify({ notes })
+        JSON.stringify({ notes }),
       );
 
       // Sync QC status to Google Sheets
@@ -424,7 +424,7 @@ router.post(
       logger.error("[QC] Error approving submission:", error);
       res.status(500).json({ error: "Failed to approve submission" });
     }
-  }
+  },
 );
 
 /**
@@ -473,13 +473,13 @@ router.post(
             status = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `
+      `,
       ).run(
         QC_STATUS.REJECTED,
         fullNotes,
         reviewer_name,
         SUBMISSION_STATUS.QC_REJECTED,
-        id
+        id,
       );
 
       // Log to history
@@ -487,13 +487,13 @@ router.post(
         `
         INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         id,
         reviewer_name,
         submission.qc_status,
         QC_STATUS.REJECTED,
-        fullNotes
+        fullNotes,
       );
 
       // Audit log
@@ -501,7 +501,7 @@ router.post(
         `
         INSERT INTO audit_log (entity_type, entity_id, action, actor, details)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         "submission",
         id,
@@ -510,7 +510,7 @@ router.post(
         JSON.stringify({
           notes,
           rejection_reasons,
-        })
+        }),
       );
 
       // Sync QC status to Google Sheets
@@ -525,7 +525,7 @@ router.post(
         });
 
       logger.info(
-        `[QC] Submission ${id} rejected by ${reviewer_name}: ${notes}`
+        `[QC] Submission ${id} rejected by ${reviewer_name}: ${notes}`,
       );
 
       res.json({
@@ -538,7 +538,7 @@ router.post(
       logger.error("[QC] Error rejecting submission:", error);
       res.status(500).json({ error: "Failed to reject submission" });
     }
-  }
+  },
 );
 
 /**
@@ -573,7 +573,7 @@ router.post(
       }
 
       const changeNotes = `Changes requested: ${changes_requested.join(
-        ", "
+        ", ",
       )}. ${notes || ""}`.trim();
 
       // Update submission - keep status as pending for resubmission
@@ -586,7 +586,7 @@ router.post(
             status = 'pending_changes',
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `
+      `,
       ).run(changeNotes, reviewer_name, id);
 
       // Log to history
@@ -594,17 +594,17 @@ router.post(
         `
         INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         id,
         reviewer_name,
         submission.qc_status,
         "changes_requested",
-        changeNotes
+        changeNotes,
       );
 
       logger.info(
-        `[QC] Changes requested for submission ${id} by ${reviewer_name}`
+        `[QC] Changes requested for submission ${id} by ${reviewer_name}`,
       );
 
       res.json({
@@ -616,7 +616,7 @@ router.post(
       logger.error("[QC] Error requesting changes:", error);
       res.status(500).json({ error: "Failed to request changes" });
     }
-  }
+  },
 );
 
 /**
@@ -637,7 +637,7 @@ router.get("/stats", async (req, res) => {
         COUNT(CASE WHEN qc_status = 'rejected' THEN 1 END) as rejected,
         COUNT(*) as total
       FROM submissions
-    `
+    `,
       )
       .get();
 
@@ -651,7 +651,7 @@ router.get("/stats", async (req, res) => {
         COUNT(CASE WHEN qc_status = 'rejected' THEN 1 END) as rejected_today
       FROM submissions
       WHERE DATE(qc_reviewed_at) = ?
-    `
+    `,
       )
       .get(today);
 
@@ -669,7 +669,7 @@ router.get("/stats", async (req, res) => {
       GROUP BY qc_reviewed_by
       ORDER BY total_reviews DESC
       LIMIT 10
-    `
+    `,
       )
       .all();
 
@@ -699,7 +699,7 @@ router.get("/history/:submissionId", async (req, res) => {
       SELECT * FROM qc_history 
       WHERE submission_id = ? 
       ORDER BY created_at DESC
-    `
+    `,
       )
       .all(submissionId);
 
@@ -720,7 +720,9 @@ router.get("/per-language/:submissionId", async (req, res) => {
     const { submissionId } = req.params;
 
     const submission = db
-      .prepare("SELECT id, selected_languages, qc_status FROM submissions WHERE id = ?")
+      .prepare(
+        "SELECT id, selected_languages, qc_status FROM submissions WHERE id = ?",
+      )
       .get(submissionId);
 
     if (!submission) {
@@ -730,68 +732,84 @@ router.get("/per-language/:submissionId", async (req, res) => {
     const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
 
     // Get all generated audio with their QC status
-    const generatedAudio = db.prepare(`
+    const generatedAudio = db
+      .prepare(
+        `
       SELECT 
         ga.*,
         am.title as audio_master_title
       FROM generated_audio ga
       LEFT JOIN audio_masters am ON ga.audio_master_id = am.id
       WHERE ga.submission_id = ?
-    `).all(submissionId);
+    `,
+      )
+      .all(submissionId);
 
     // Get all generated videos
-    const generatedVideos = db.prepare(`
+    const generatedVideos = db
+      .prepare(
+        `
       SELECT * FROM generated_videos WHERE submission_id = ?
-    `).all(submissionId);
+    `,
+      )
+      .all(submissionId);
 
     // Build per-language status
-    const languages = selectedLanguages.map(langCode => {
-      const audio = generatedAudio.find(a => a.language_code === langCode);
-      const video = generatedVideos.find(v => v.language_code === langCode);
+    const languages = selectedLanguages.map((langCode) => {
+      const audio = generatedAudio.find((a) => a.language_code === langCode);
+      const video = generatedVideos.find((v) => v.language_code === langCode);
 
       return {
         language_code: langCode,
-        audio: audio ? {
-          id: audio.id,
-          status: audio.status,
-          file_path: audio.file_path,
-          gcs_path: audio.gcs_path,
-          public_url: audio.public_url,
-          audio_master_title: audio.audio_master_title,
-          qc_status: audio.qc_status || 'pending',
-          qc_notes: audio.qc_notes || null,
-          created_at: audio.created_at,
-          error_message: audio.error_message
-        } : null,
-        video: video ? {
-          id: video.id,
-          status: video.status,
-          file_path: video.file_path,
-          gcs_path: video.gcs_path,
-          duration_seconds: video.duration_seconds,
-          qc_status: video.qc_status || 'pending',
-          qc_notes: video.qc_notes || null,
-          created_at: video.created_at,
-          error_message: video.error_message
-        } : null,
-        ready_for_qc: (audio?.status === 'completed') && (video?.status === 'completed'),
-        qc_complete: (audio?.qc_status === 'approved') && (video?.qc_status === 'approved')
+        audio: audio
+          ? {
+              id: audio.id,
+              status: audio.status,
+              file_path: audio.file_path,
+              gcs_path: audio.gcs_path,
+              public_url: audio.public_url,
+              audio_master_title: audio.audio_master_title,
+              qc_status: audio.qc_status || "pending",
+              qc_notes: audio.qc_notes || null,
+              created_at: audio.created_at,
+              error_message: audio.error_message,
+            }
+          : null,
+        video: video
+          ? {
+              id: video.id,
+              status: video.status,
+              file_path: video.file_path,
+              gcs_path: video.gcs_path,
+              duration_seconds: video.duration_seconds,
+              qc_status: video.qc_status || "pending",
+              qc_notes: video.qc_notes || null,
+              created_at: video.created_at,
+              error_message: video.error_message,
+            }
+          : null,
+        ready_for_qc:
+          audio?.status === "completed" && video?.status === "completed",
+        qc_complete:
+          audio?.qc_status === "approved" && video?.qc_status === "approved",
       };
     });
 
     const summary = {
       total_languages: selectedLanguages.length,
-      audio_ready: languages.filter(l => l.audio?.status === 'completed').length,
-      video_ready: languages.filter(l => l.video?.status === 'completed').length,
-      fully_ready_for_qc: languages.filter(l => l.ready_for_qc).length,
-      fully_qc_approved: languages.filter(l => l.qc_complete).length
+      audio_ready: languages.filter((l) => l.audio?.status === "completed")
+        .length,
+      video_ready: languages.filter((l) => l.video?.status === "completed")
+        .length,
+      fully_ready_for_qc: languages.filter((l) => l.ready_for_qc).length,
+      fully_qc_approved: languages.filter((l) => l.qc_complete).length,
     };
 
     res.json({
       submission_id: submissionId,
       overall_qc_status: submission.qc_status,
       summary,
-      languages
+      languages,
     });
   } catch (error) {
     logger.error("[QC] Error fetching per-language status:", error);
@@ -804,29 +822,34 @@ router.get("/per-language/:submissionId", async (req, res) => {
  * Approve audio and/or video for a specific language
  * Body: { approve_audio: true, approve_video: true, reviewer_name, notes }
  */
-router.post("/approve-language/:submissionId/:languageCode", async (req, res) => {
-  const db = getDb();
-  const { submissionId, languageCode } = req.params;
-  const { approve_audio, approve_video, reviewer_name, notes } = req.body;
+router.post(
+  "/approve-language/:submissionId/:languageCode",
+  async (req, res) => {
+    const db = getDb();
+    const { submissionId, languageCode } = req.params;
+    const { approve_audio, approve_video, reviewer_name, notes } = req.body;
 
-  try {
-    const submission = db
-      .prepare("SELECT * FROM submissions WHERE id = ?")
-      .get(submissionId);
+    try {
+      const submission = db
+        .prepare("SELECT * FROM submissions WHERE id = ?")
+        .get(submissionId);
 
-    if (!submission) {
-      return res.status(404).json({ error: "Submission not found" });
-    }
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
 
-    const results = { audio: null, video: null };
+      const results = { audio: null, video: null };
 
-    if (approve_audio) {
-      const audio = db.prepare(
-        "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?"
-      ).get(submissionId, languageCode);
+      if (approve_audio) {
+        const audio = db
+          .prepare(
+            "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?",
+          )
+          .get(submissionId, languageCode);
 
-      if (audio) {
-        db.prepare(`
+        if (audio) {
+          db.prepare(
+            `
           UPDATE generated_audio 
           SET qc_status = 'approved', 
               qc_notes = ?,
@@ -834,18 +857,22 @@ router.post("/approve-language/:submissionId/:languageCode", async (req, res) =>
               qc_reviewed_at = CURRENT_TIMESTAMP,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(notes || null, reviewer_name, audio.id);
-        results.audio = 'approved';
+        `,
+          ).run(notes || null, reviewer_name, audio.id);
+          results.audio = "approved";
+        }
       }
-    }
 
-    if (approve_video) {
-      const video = db.prepare(
-        "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?"
-      ).get(submissionId, languageCode);
+      if (approve_video) {
+        const video = db
+          .prepare(
+            "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?",
+          )
+          .get(submissionId, languageCode);
 
-      if (video) {
-        db.prepare(`
+        if (video) {
+          db.prepare(
+            `
           UPDATE generated_videos 
           SET qc_status = 'approved', 
               qc_notes = ?,
@@ -853,30 +880,43 @@ router.post("/approve-language/:submissionId/:languageCode", async (req, res) =>
               qc_reviewed_at = CURRENT_TIMESTAMP,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(notes || null, reviewer_name, video.id);
-        results.video = 'approved';
+        `,
+          ).run(notes || null, reviewer_name, video.id);
+          results.video = "approved";
+        }
       }
-    }
 
-    // Check if all languages are now QC approved
-    const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
-    
-    const approvedAudioCount = db.prepare(`
+      // Check if all languages are now QC approved
+      const selectedLanguages = JSON.parse(
+        submission.selected_languages || "[]",
+      );
+
+      const approvedAudioCount = db
+        .prepare(
+          `
       SELECT COUNT(*) as count FROM generated_audio 
       WHERE submission_id = ? AND qc_status = 'approved'
-    `).get(submissionId).count;
+    `,
+        )
+        .get(submissionId).count;
 
-    const approvedVideoCount = db.prepare(`
+      const approvedVideoCount = db
+        .prepare(
+          `
       SELECT COUNT(*) as count FROM generated_videos 
       WHERE submission_id = ? AND qc_status = 'approved'
-    `).get(submissionId).count;
+    `,
+        )
+        .get(submissionId).count;
 
-    const allApproved = approvedAudioCount >= selectedLanguages.length && 
-                        approvedVideoCount >= selectedLanguages.length;
+      const allApproved =
+        approvedAudioCount >= selectedLanguages.length &&
+        approvedVideoCount >= selectedLanguages.length;
 
-    // Update overall submission QC status if all languages approved
-    if (allApproved) {
-      db.prepare(`
+      // Update overall submission QC status if all languages approved
+      if (allApproved) {
+        db.prepare(
+          `
         UPDATE submissions 
         SET qc_status = 'approved',
             status = 'completed',
@@ -884,80 +924,96 @@ router.post("/approve-language/:submissionId/:languageCode", async (req, res) =>
             qc_reviewed_by = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(reviewer_name, submissionId);
-    }
+      `,
+        ).run(reviewer_name, submissionId);
+      }
 
-    // Log to QC history
-    db.prepare(`
+      // Log to QC history
+      db.prepare(
+        `
       INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
       VALUES (?, ?, ?, ?, ?)
-    `).run(
-      submissionId,
-      reviewer_name || 'Unknown',
-      submission.qc_status,
-      allApproved ? 'approved' : 'in_progress',
-      `Language ${languageCode}: Audio=${results.audio || 'unchanged'}, Video=${results.video || 'unchanged'}. ${notes || ''}`
-    );
+    `,
+      ).run(
+        submissionId,
+        reviewer_name || "Unknown",
+        submission.qc_status,
+        allApproved ? "approved" : "in_progress",
+        `Language ${languageCode}: Audio=${results.audio || "unchanged"}, Video=${results.video || "unchanged"}. ${notes || ""}`,
+      );
 
-    // Sync to Google Sheet
-    try {
-      await googleSheetsService.updateQCStatusForLanguage(submissionId, languageCode, {
-        status: "Approved",
-        reason: notes || "",
-        comments: reviewer_name ? `Reviewed by: ${reviewer_name}` : "",
+      // Sync to Google Sheet
+      try {
+        await googleSheetsService.updateQCStatusForLanguage(
+          submissionId,
+          languageCode,
+          {
+            status: "Approved",
+            reason: notes || "",
+            comments: reviewer_name ? `Reviewed by: ${reviewer_name}` : "",
+          },
+        );
+      } catch (sheetError) {
+        logger.warn(
+          `[QC] Failed to sync approval to sheet: ${sheetError.message}`,
+        );
+      }
+
+      res.json({
+        message: `QC updated for language ${languageCode}`,
+        submission_id: submissionId,
+        language_code: languageCode,
+        results,
+        all_languages_approved: allApproved,
+        approved_audio_count: approvedAudioCount,
+        approved_video_count: approvedVideoCount,
+        total_languages: selectedLanguages.length,
       });
-    } catch (sheetError) {
-      logger.warn(`[QC] Failed to sync approval to sheet: ${sheetError.message}`);
+    } catch (error) {
+      logger.error(`[QC] Error approving language ${languageCode}:`, error);
+      res.status(500).json({ error: "Failed to approve language" });
     }
-
-    res.json({
-      message: `QC updated for language ${languageCode}`,
-      submission_id: submissionId,
-      language_code: languageCode,
-      results,
-      all_languages_approved: allApproved,
-      approved_audio_count: approvedAudioCount,
-      approved_video_count: approvedVideoCount,
-      total_languages: selectedLanguages.length
-    });
-  } catch (error) {
-    logger.error(`[QC] Error approving language ${languageCode}:`, error);
-    res.status(500).json({ error: "Failed to approve language" });
-  }
-});
+  },
+);
 
 /**
  * POST /api/qc/reject-language/:submissionId/:languageCode
  * Reject audio and/or video for a specific language
  * Body: { reject_audio: true, reject_video: true, reviewer_name, rejection_reason }
  */
-router.post("/reject-language/:submissionId/:languageCode", async (req, res) => {
-  const db = getDb();
-  const { submissionId, languageCode } = req.params;
-  const { reject_audio, reject_video, reviewer_name, rejection_reason } = req.body;
+router.post(
+  "/reject-language/:submissionId/:languageCode",
+  async (req, res) => {
+    const db = getDb();
+    const { submissionId, languageCode } = req.params;
+    const { reject_audio, reject_video, reviewer_name, rejection_reason } =
+      req.body;
 
-  try {
-    const submission = db
-      .prepare("SELECT * FROM submissions WHERE id = ?")
-      .get(submissionId);
+    try {
+      const submission = db
+        .prepare("SELECT * FROM submissions WHERE id = ?")
+        .get(submissionId);
 
-    if (!submission) {
-      return res.status(404).json({ error: "Submission not found" });
-    }
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
 
-    if (!rejection_reason) {
-      return res.status(400).json({ error: "Rejection reason is required" });
-    }
+      if (!rejection_reason) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+      }
 
-    const results = { audio: null, video: null };
+      const results = { audio: null, video: null };
 
-    if (reject_audio) {
-      const audio = db.prepare(
-        "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?"
-      ).get(submissionId, languageCode);
+      if (reject_audio) {
+        const audio = db
+          .prepare(
+            "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?",
+          )
+          .get(submissionId, languageCode);
 
-      if (audio) {
-        db.prepare(`
+        if (audio) {
+          db.prepare(
+            `
           UPDATE generated_audio 
           SET qc_status = 'rejected', 
               qc_notes = ?,
@@ -965,18 +1021,22 @@ router.post("/reject-language/:submissionId/:languageCode", async (req, res) => 
               qc_reviewed_at = CURRENT_TIMESTAMP,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(rejection_reason, reviewer_name, audio.id);
-        results.audio = 'rejected';
+        `,
+          ).run(rejection_reason, reviewer_name, audio.id);
+          results.audio = "rejected";
+        }
       }
-    }
 
-    if (reject_video) {
-      const video = db.prepare(
-        "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?"
-      ).get(submissionId, languageCode);
+      if (reject_video) {
+        const video = db
+          .prepare(
+            "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?",
+          )
+          .get(submissionId, languageCode);
 
-      if (video) {
-        db.prepare(`
+        if (video) {
+          db.prepare(
+            `
           UPDATE generated_videos 
           SET qc_status = 'rejected', 
               qc_notes = ?,
@@ -984,13 +1044,15 @@ router.post("/reject-language/:submissionId/:languageCode", async (req, res) => 
               qc_reviewed_at = CURRENT_TIMESTAMP,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(rejection_reason, reviewer_name, video.id);
-        results.video = 'rejected';
+        `,
+          ).run(rejection_reason, reviewer_name, video.id);
+          results.video = "rejected";
+        }
       }
-    }
 
-    // Update overall submission QC status to rejected
-    db.prepare(`
+      // Update overall submission QC status to rejected
+      db.prepare(
+        `
       UPDATE submissions 
       SET qc_status = 'rejected',
           qc_notes = ?,
@@ -998,42 +1060,56 @@ router.post("/reject-language/:submissionId/:languageCode", async (req, res) => 
           qc_reviewed_by = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(`Language ${languageCode} rejected: ${rejection_reason}`, reviewer_name, submissionId);
+    `,
+      ).run(
+        `Language ${languageCode} rejected: ${rejection_reason}`,
+        reviewer_name,
+        submissionId,
+      );
 
-    // Log to QC history
-    db.prepare(`
+      // Log to QC history
+      db.prepare(
+        `
       INSERT INTO qc_history (submission_id, reviewer_name, previous_status, new_status, notes)
       VALUES (?, ?, ?, ?, ?)
-    `).run(
-      submissionId,
-      reviewer_name || 'Unknown',
-      submission.qc_status,
-      'rejected',
-      `Language ${languageCode} REJECTED: Audio=${results.audio || 'unchanged'}, Video=${results.video || 'unchanged'}. Reason: ${rejection_reason}`
-    );
+    `,
+      ).run(
+        submissionId,
+        reviewer_name || "Unknown",
+        submission.qc_status,
+        "rejected",
+        `Language ${languageCode} REJECTED: Audio=${results.audio || "unchanged"}, Video=${results.video || "unchanged"}. Reason: ${rejection_reason}`,
+      );
 
-    // Sync to Google Sheet
-    try {
-      await googleSheetsService.updateQCStatusForLanguage(submissionId, languageCode, {
-        status: "Rejected",
-        reason: rejection_reason,
-        comments: reviewer_name ? `Reviewed by: ${reviewer_name}` : "",
+      // Sync to Google Sheet
+      try {
+        await googleSheetsService.updateQCStatusForLanguage(
+          submissionId,
+          languageCode,
+          {
+            status: "Rejected",
+            reason: rejection_reason,
+            comments: reviewer_name ? `Reviewed by: ${reviewer_name}` : "",
+          },
+        );
+      } catch (sheetError) {
+        logger.warn(
+          `[QC] Failed to sync rejection to sheet: ${sheetError.message}`,
+        );
+      }
+
+      res.json({
+        message: `Language ${languageCode} rejected`,
+        submission_id: submissionId,
+        language_code: languageCode,
+        results,
+        rejection_reason,
       });
-    } catch (sheetError) {
-      logger.warn(`[QC] Failed to sync rejection to sheet: ${sheetError.message}`);
+    } catch (error) {
+      logger.error(`[QC] Error rejecting language ${languageCode}:`, error);
+      res.status(500).json({ error: "Failed to reject language" });
     }
-
-    res.json({
-      message: `Language ${languageCode} rejected`,
-      submission_id: submissionId,
-      language_code: languageCode,
-      results,
-      rejection_reason
-    });
-  } catch (error) {
-    logger.error(`[QC] Error rejecting language ${languageCode}:`, error);
-    res.status(500).json({ error: "Failed to reject language" });
-  }
-});
+  },
+);
 
 module.exports = router;

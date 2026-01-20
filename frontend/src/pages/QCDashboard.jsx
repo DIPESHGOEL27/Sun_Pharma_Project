@@ -32,6 +32,8 @@ export default function QCDashboard() {
     localStorage.getItem("qc_reviewer") || ""
   );
   const [actionLoading, setActionLoading] = useState("");
+  const [adminRole] = useState(sessionStorage.getItem("adminRole") || "admin");
+  const isViewer = adminRole === "viewer";
 
   useEffect(() => {
     loadData();
@@ -194,7 +196,7 @@ export default function QCDashboard() {
                         ? "border-sunpharma-blue bg-blue-50"
                         : "border-gray-200 hover:border-gray-300"
                     }`}
-                    onClick={() => handleStartReview(sub.id)}
+                    onClick={() => !isViewer && handleStartReview(sub.id)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-900">
@@ -235,6 +237,7 @@ export default function QCDashboard() {
               onApprove={handleApprove}
               onReject={handleReject}
               onClose={() => setSelectedSubmission(null)}
+              isViewer={isViewer}
             />
           ) : (
             <div className="card h-full flex items-center justify-center text-gray-400">
@@ -283,6 +286,7 @@ function ReviewPanel({
   onApprove,
   onReject,
   onClose,
+  isViewer = false,
 }) {
   const [notes, setNotes] = useState("");
   const [selectedReasons, setSelectedReasons] = useState([]);
@@ -445,8 +449,8 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Action Buttons */}
-      {!showRejectForm ? (
+      {/* Action Buttons - Hidden for viewers */}
+      {!isViewer && !showRejectForm ? (
         <div className="flex gap-4">
           <button
             onClick={() => onApprove(notes)}
@@ -462,7 +466,7 @@ function ReviewPanel({
             ✗ Reject
           </button>
         </div>
-      ) : (
+      ) : !isViewer ? (
         <div className="space-y-4 border-t pt-4">
           <h4 className="font-medium text-gray-900">Rejection Details</h4>
 
@@ -524,6 +528,10 @@ function ReviewPanel({
                 : "Confirm Rejection"}
             </button>
           </div>
+        </div>
+      ) : (
+        <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+          <p className="text-sm">View-only mode. No actions available.</p>
         </div>
       )}
     </div>

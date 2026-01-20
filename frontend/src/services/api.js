@@ -18,7 +18,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // Response interceptor for error handling
@@ -30,13 +30,14 @@ api.interceptors.response.use(
       window.location.href = "/login";
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Submissions API
 export const submissionsApi = {
   list: (params = {}) => api.get("/submissions", { params }),
-  listByLanguage: (params = {}) => api.get("/submissions/by-language", { params }),
+  listByLanguage: (params = {}) =>
+    api.get("/submissions/by-language", { params }),
   get: (id) => api.get(`/submissions/${id}`),
   create: (data) =>
     api.post("/submissions", data, {
@@ -85,7 +86,8 @@ export const voiceApi = {
   list: () => api.get("/voice/list"),
   listActive: () => api.get("/voice/active"),
   cleanup: (params = {}) => api.post("/voice/cleanup", null, { params }),
-  cleanupAll: () => api.delete("/voice/cleanup/all", { params: { confirm: 'true' } }),
+  cleanupAll: () =>
+    api.delete("/voice/cleanup/all", { params: { confirm: "true" } }),
 };
 
 // Audio Masters API
@@ -218,7 +220,7 @@ export const storageApi = {
     fileName,
     fileType,
     bucketType = "UPLOADS",
-    folder = ""
+    folder = "",
   ) =>
     api.post("/storage/signed-upload-url", {
       fileName,
@@ -265,7 +267,7 @@ export const storageApi = {
   uploadFilesToGCS: async (
     uploadConfigs,
     onFileProgress,
-    onOverallProgress
+    onOverallProgress,
   ) => {
     const results = [];
     let completedFiles = 0;
@@ -280,10 +282,10 @@ export const storageApi = {
               onFileProgress(
                 config.index,
                 percent,
-                config.originalName || config.file.name
+                config.originalName || config.file.name,
               );
             }
-          }
+          },
         );
 
         results.push({
@@ -298,7 +300,7 @@ export const storageApi = {
         completedFiles++;
         if (onOverallProgress) {
           onOverallProgress(
-            Math.round((completedFiles / uploadConfigs.length) * 100)
+            Math.round((completedFiles / uploadConfigs.length) * 100),
           );
         }
       } catch (error) {

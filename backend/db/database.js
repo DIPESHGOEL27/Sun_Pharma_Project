@@ -481,7 +481,7 @@ async function initDatabase() {
     { name: "qc_status", type: "TEXT DEFAULT 'pending'" },
     { name: "qc_notes", type: "TEXT" },
     { name: "qc_reviewed_by", type: "TEXT" },
-    { name: "qc_reviewed_at", type: "DATETIME" }
+    { name: "qc_reviewed_at", type: "DATETIME" },
   ];
 
   for (const col of generatedAudioColumns) {
@@ -492,12 +492,14 @@ async function initDatabase() {
     }
   }
 
-  // Migration: Add QC columns to generated_videos table
+  // Migration: Add QC columns and public_url to generated_videos table
   const generatedVideosColumns = [
+    { name: "public_url", type: "TEXT" },
+    { name: "video_url", type: "TEXT" },
     { name: "qc_status", type: "TEXT DEFAULT 'pending'" },
     { name: "qc_notes", type: "TEXT" },
     { name: "qc_reviewed_by", type: "TEXT" },
-    { name: "qc_reviewed_at", type: "DATETIME" }
+    { name: "qc_reviewed_at", type: "DATETIME" },
   ];
 
   for (const col of generatedVideosColumns) {

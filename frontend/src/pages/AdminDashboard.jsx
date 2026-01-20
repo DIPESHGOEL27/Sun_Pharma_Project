@@ -265,16 +265,18 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleSyncSheets}
-            disabled={loading}
-            className="btn btn-secondary flex items-center gap-2"
-          >
-            <ArrowPathIcon
-              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-            />
-            Sync to Sheets
-          </button>
+          {userRole !== "viewer" && (
+            <button
+              onClick={handleSyncSheets}
+              disabled={loading}
+              className="btn btn-secondary flex items-center gap-2"
+            >
+              <ArrowPathIcon
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
+              Sync to Sheets
+            </button>
+          )}
           <button
             onClick={handleLogout}
             className="btn btn-outline flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"

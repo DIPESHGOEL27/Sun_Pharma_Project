@@ -114,7 +114,7 @@ router.post("/clone/:submissionId", async (req, res) => {
       FROM submissions s
       JOIN doctors d ON s.doctor_id = d.id
       WHERE s.id = ?
-    `
+    `,
       )
       .get(submissionId);
 
@@ -162,18 +162,18 @@ router.post("/clone/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET voice_clone_status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
       ).run(VOICE_CLONE_STATUS.IN_PROGRESS, submissionId);
 
       // Clone voice
       const voiceName = `SunPharma_${submission.doctor_name.replace(
         /\s+/g,
-        "_"
+        "_",
       )}_${submissionId}`;
       const result = await elevenLabs.cloneVoice(
         voiceName,
         samplePaths,
-        `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`
+        `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`,
       );
 
       // Update submission with voice ID
@@ -185,12 +185,12 @@ router.post("/clone/:submissionId", async (req, res) => {
           status = ?,
           updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
       ).run(
         result.voice_id,
         VOICE_CLONE_STATUS.COMPLETED,
         SUBMISSION_STATUS.CONSENT_VERIFIED,
-        submissionId
+        submissionId,
       );
 
       // Log audit
@@ -198,16 +198,16 @@ router.post("/clone/:submissionId", async (req, res) => {
         `
       INSERT INTO audit_log (entity_type, entity_id, action, details)
       VALUES (?, ?, ?, ?)
-    `
+    `,
       ).run(
         "submission",
         submissionId,
         "voice_cloned",
-        JSON.stringify({ voice_id: result.voice_id })
+        JSON.stringify({ voice_id: result.voice_id }),
       );
 
       logger.info(
-        `[VOICE] Cloned voice for submission ${submissionId}: ${result.voice_id}`
+        `[VOICE] Cloned voice for submission ${submissionId}: ${result.voice_id}`,
       );
 
       res.json({
@@ -227,7 +227,7 @@ router.post("/clone/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET voice_clone_status = ?, voice_clone_error = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(VOICE_CLONE_STATUS.FAILED, error.message, submissionId);
 
     res
@@ -249,7 +249,7 @@ router.delete("/:submissionId", async (req, res) => {
       .prepare(
         `
       SELECT * FROM submissions WHERE id = ?
-    `
+    `,
       )
       .get(submissionId);
 
@@ -272,7 +272,7 @@ router.delete("/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET voice_clone_status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(VOICE_CLONE_STATUS.DELETED, submissionId);
 
     // Log audit
@@ -280,18 +280,18 @@ router.delete("/:submissionId", async (req, res) => {
       `
       INSERT INTO audit_log (entity_type, entity_id, action, details)
       VALUES (?, ?, ?, ?)
-    `
+    `,
     ).run(
       "submission",
       submissionId,
       "voice_deleted",
       JSON.stringify({
         voice_id: submission.elevenlabs_voice_id,
-      })
+      }),
     );
 
     logger.info(
-      `[VOICE] Deleted voice ${submission.elevenlabs_voice_id} for submission ${submissionId}`
+      `[VOICE] Deleted voice ${submission.elevenlabs_voice_id} for submission ${submissionId}`,
     );
 
     res.json({
@@ -301,7 +301,7 @@ router.delete("/:submissionId", async (req, res) => {
   } catch (error) {
     logger.error(
       `[VOICE] Delete failed for submission ${submissionId}:`,
-      error
+      error,
     );
     res
       .status(500)
@@ -323,7 +323,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
       .prepare(
         `
       SELECT * FROM submissions WHERE id = ?
-    `
+    `,
       )
       .get(submissionId);
 
@@ -344,7 +344,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
     db.prepare(
       `
       UPDATE submissions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `
+    `,
     ).run(SUBMISSION_STATUS.AUDIO_GENERATION, submissionId);
 
     const results = [];
@@ -361,7 +361,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
           SELECT * FROM audio_masters 
           WHERE language_code = ? AND is_active = 1 
           ORDER BY created_at DESC LIMIT 1
-        `
+        `,
           )
           .get(langCode);
 
@@ -373,7 +373,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
         // Ensure master audio is available locally
         const masterPath = await ensureLocalFile(
           audioMaster.file_path,
-          "AUDIO_MASTERS"
+          "AUDIO_MASTERS",
         );
         if (isTempFile(masterPath)) tempFiles.push(masterPath);
 
@@ -381,7 +381,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
         const outputDir = path.join(
           __dirname,
           "../uploads/generated_audio",
-          submissionId.toString()
+          submissionId.toString(),
         );
         if (!fs.existsSync(outputDir)) {
           fs.mkdirSync(outputDir, { recursive: true });
@@ -395,7 +395,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
           submission.elevenlabs_voice_id,
           masterPath,
           outputPath,
-          langCode
+          langCode,
         );
 
         // Insert generated audio record
@@ -406,7 +406,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
             file_path, status
           )
           VALUES (?, ?, ?, ?, ?)
-        `
+        `,
         ).run(submissionId, langCode, audioMaster.id, outputPath, "completed");
 
         results.push({
@@ -416,12 +416,12 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
         });
 
         logger.info(
-          `[VOICE] Generated audio for submission ${submissionId}, language: ${langCode}`
+          `[VOICE] Generated audio for submission ${submissionId}, language: ${langCode}`,
         );
       } catch (langError) {
         logger.error(
           `[VOICE] Error generating audio for ${langCode}:`,
-          langError
+          langError,
         );
         errors.push({ language: langCode, error: langError.message });
 
@@ -432,7 +432,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
             submission_id, language_code, status, error_message
           )
           VALUES (?, ?, ?, ?)
-        `
+        `,
         ).run(submissionId, langCode, "failed", langError.message);
       }
     }
@@ -444,10 +444,10 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(
       allCompleted ? SUBMISSION_STATUS.PENDING_QC : SUBMISSION_STATUS.FAILED,
-      submissionId
+      submissionId,
     );
 
     // NOTE: Voice is NOT auto-deleted after generation.
@@ -455,7 +455,7 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
     // Use POST /api/voice/cleanup to delete voices manually or on schedule.
     if (allCompleted) {
       logger.info(
-        `[VOICE] Audio generation completed for submission ${submissionId}. Voice ${submission.elevenlabs_voice_id} retained for reuse.`
+        `[VOICE] Audio generation completed for submission ${submissionId}. Voice ${submission.elevenlabs_voice_id} retained for reuse.`,
       );
     }
 
@@ -472,13 +472,13 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
   } catch (error) {
     logger.error(
       `[VOICE] Speech-to-speech failed for submission ${submissionId}:`,
-      error
+      error,
     );
 
     db.prepare(
       `
       UPDATE submissions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `
+    `,
     ).run(SUBMISSION_STATUS.FAILED, submissionId);
 
     res.status(500).json({
@@ -508,7 +508,7 @@ router.post("/process/:submissionId", async (req, res) => {
         FROM submissions s
         JOIN doctors d ON s.doctor_id = d.id
         WHERE s.id = ?
-      `
+      `,
       )
       .get(submissionId);
 
@@ -545,17 +545,17 @@ router.post("/process/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET voice_clone_status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(VOICE_CLONE_STATUS.IN_PROGRESS, submissionId);
 
     const voiceName = `SunPharma_${submission.doctor_name.replace(
       /\s+/g,
-      "_"
+      "_",
     )}_${submissionId}`;
     const cloneResult = await elevenLabs.cloneVoice(
       voiceName,
       samplePaths,
-      `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`
+      `Voice clone for Dr. ${submission.doctor_name} - Submission ${submissionId}`,
     );
 
     const voiceId = cloneResult.voice_id;
@@ -565,12 +565,12 @@ router.post("/process/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET elevenlabs_voice_id = ?, voice_clone_status = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(
       voiceId,
       VOICE_CLONE_STATUS.COMPLETED,
       SUBMISSION_STATUS.CONSENT_VERIFIED,
-      submissionId
+      submissionId,
     );
 
     const results = [];
@@ -584,7 +584,7 @@ router.post("/process/:submissionId", async (req, res) => {
             SELECT * FROM audio_masters 
             WHERE language_code = ? AND is_active = 1 
             ORDER BY created_at DESC LIMIT 1
-          `
+          `,
           )
           .get(langCode);
 
@@ -595,14 +595,14 @@ router.post("/process/:submissionId", async (req, res) => {
 
         const masterPath = await ensureLocalFile(
           audioMaster.file_path,
-          "AUDIO_MASTERS"
+          "AUDIO_MASTERS",
         );
         if (isTempFile(masterPath)) tempFiles.push(masterPath);
 
         const outputDir = path.join(
           __dirname,
           "../uploads/generated_audio",
-          submissionId.toString()
+          submissionId.toString(),
         );
         if (!fs.existsSync(outputDir)) {
           fs.mkdirSync(outputDir, { recursive: true });
@@ -615,7 +615,7 @@ router.post("/process/:submissionId", async (req, res) => {
           voiceId,
           masterPath,
           outputPath,
-          langCode
+          langCode,
         );
 
         // Upload generated audio to GCS for download access
@@ -627,14 +627,14 @@ router.post("/process/:submissionId", async (req, res) => {
             outputPath,
             "GENERATED_AUDIO",
             gcsDestination,
-            { contentType: "audio/mpeg", makePublic: true }
+            { contentType: "audio/mpeg", makePublic: true },
           );
           gcsPath = uploadResult.gcsPath;
           publicUrl = uploadResult.publicUrl;
           logger.info(`[VOICE] Uploaded generated audio to GCS: ${publicUrl}`);
         } catch (uploadErr) {
           logger.warn(
-            `[VOICE] Failed to upload to GCS, using local path: ${uploadErr.message}`
+            `[VOICE] Failed to upload to GCS, using local path: ${uploadErr.message}`,
           );
           // Fall back to local path if GCS upload fails
           publicUrl = `/api/uploads/generated_audio/${submissionId}/${outputFilename}`;
@@ -647,7 +647,7 @@ router.post("/process/:submissionId", async (req, res) => {
             file_path, gcs_path, public_url, status
           )
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `
+        `,
         ).run(
           submissionId,
           langCode,
@@ -655,7 +655,7 @@ router.post("/process/:submissionId", async (req, res) => {
           outputPath,
           gcsPath,
           publicUrl,
-          "completed"
+          "completed",
         );
 
         results.push({
@@ -673,7 +673,7 @@ router.post("/process/:submissionId", async (req, res) => {
             submission_id, language_code, status, error_message
           )
           VALUES (?, ?, ?, ?)
-        `
+        `,
         ).run(submissionId, langCode, "failed", langError.message);
       }
     }
@@ -684,17 +684,17 @@ router.post("/process/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET status = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(
       allCompleted ? SUBMISSION_STATUS.PENDING_QC : SUBMISSION_STATUS.FAILED,
-      submissionId
+      submissionId,
     );
 
     // NOTE: Voice is NOT auto-deleted after /process pipeline.
     // Voices are deleted on a schedule (end of day) or when slots are full.
     // Use POST /api/voice/cleanup to delete voices manually or on schedule.
     logger.info(
-      `[VOICE] Process pipeline completed for submission ${submissionId}. Voice ${voiceId} retained for reuse.`
+      `[VOICE] Process pipeline completed for submission ${submissionId}. Voice ${voiceId} retained for reuse.`,
     );
 
     res.json({
@@ -709,7 +709,7 @@ router.post("/process/:submissionId", async (req, res) => {
   } catch (error) {
     logger.error(
       `[VOICE] Process pipeline failed for submission ${submissionId}:`,
-      error
+      error,
     );
 
     db.prepare(
@@ -717,12 +717,12 @@ router.post("/process/:submissionId", async (req, res) => {
       UPDATE submissions 
       SET voice_clone_status = ?, status = ?, voice_clone_error = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `
+    `,
     ).run(
       VOICE_CLONE_STATUS.FAILED,
       SUBMISSION_STATUS.FAILED,
       error.message,
-      submissionId
+      submissionId,
     );
 
     res
@@ -773,11 +773,13 @@ router.post("/cleanup", async (req, res) => {
   try {
     const db = getDb();
     const maxAgeHours = parseInt(req.query.max_age_hours) || 24;
-    const statusFilter = req.query.status_filter || 'completed';
-    const dryRun = req.query.dry_run === 'true';
-    
-    logger.info(`[VOICE CLEANUP] Starting cleanup - max_age: ${maxAgeHours}h, status: ${statusFilter}, dry_run: ${dryRun}`);
-    
+    const statusFilter = req.query.status_filter || "completed";
+    const dryRun = req.query.dry_run === "true";
+
+    logger.info(
+      `[VOICE CLEANUP] Starting cleanup - max_age: ${maxAgeHours}h, status: ${statusFilter}, dry_run: ${dryRun}`,
+    );
+
     // Get submissions with active voices that meet cleanup criteria
     let query = `
       SELECT id, doctor_name, elevenlabs_voice_id, voice_clone_status, 
@@ -787,14 +789,11 @@ router.post("/cleanup", async (req, res) => {
         AND voice_clone_status = ?
         AND datetime(updated_at) < datetime('now', ?)
     `;
-    
-    const params = [
-      VOICE_CLONE_STATUS.COMPLETED,
-      `-${maxAgeHours} hours`
-    ];
-    
+
+    const params = [VOICE_CLONE_STATUS.COMPLETED, `-${maxAgeHours} hours`];
+
     // If status_filter is 'all', include submissions regardless of their status
-    if (statusFilter === 'all') {
+    if (statusFilter === "all") {
       query = `
         SELECT id, doctor_name, elevenlabs_voice_id, voice_clone_status, 
                created_at, updated_at, status as submission_status
@@ -804,89 +803,106 @@ router.post("/cleanup", async (req, res) => {
           AND datetime(updated_at) < datetime('now', ?)
       `;
     }
-    
+
     const voicesToDelete = db.prepare(query).all(...params);
-    
-    logger.info(`[VOICE CLEANUP] Found ${voicesToDelete.length} voices eligible for cleanup`);
-    
+
+    logger.info(
+      `[VOICE CLEANUP] Found ${voicesToDelete.length} voices eligible for cleanup`,
+    );
+
     if (dryRun) {
       return res.json({
-        message: 'Dry run - no voices deleted',
+        message: "Dry run - no voices deleted",
         dry_run: true,
         eligible_count: voicesToDelete.length,
-        voices: voicesToDelete.map(v => ({
+        voices: voicesToDelete.map((v) => ({
           submission_id: v.id,
           doctor_name: v.doctor_name,
           voice_id: v.elevenlabs_voice_id,
           status: v.voice_clone_status,
-          age_hours: Math.round((Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60))
-        }))
+          age_hours: Math.round(
+            (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60),
+          ),
+        })),
       });
     }
-    
+
     const results = {
       deleted: [],
       failed: [],
-      skipped: []
+      skipped: [],
     };
-    
+
     for (const submission of voicesToDelete) {
       try {
         // Delete from ElevenLabs
         await elevenLabs.deleteVoice(submission.elevenlabs_voice_id);
-        
+
         // Update database
-        db.prepare(`
+        db.prepare(
+          `
           UPDATE submissions 
           SET voice_clone_status = ?, elevenlabs_voice_id = NULL, updated_at = CURRENT_TIMESTAMP 
           WHERE id = ?
-        `).run(VOICE_CLONE_STATUS.DELETED, submission.id);
-        
+        `,
+        ).run(VOICE_CLONE_STATUS.DELETED, submission.id);
+
         results.deleted.push({
           submission_id: submission.id,
           doctor_name: submission.doctor_name,
-          voice_id: submission.elevenlabs_voice_id
+          voice_id: submission.elevenlabs_voice_id,
         });
-        
-        logger.info(`[VOICE CLEANUP] Deleted voice ${submission.elevenlabs_voice_id} for submission ${submission.id}`);
+
+        logger.info(
+          `[VOICE CLEANUP] Deleted voice ${submission.elevenlabs_voice_id} for submission ${submission.id}`,
+        );
       } catch (deleteError) {
         // If voice doesn't exist on ElevenLabs, still mark as deleted in DB
-        if (deleteError.message?.includes('not found') || deleteError.status === 404) {
-          db.prepare(`
+        if (
+          deleteError.message?.includes("not found") ||
+          deleteError.status === 404
+        ) {
+          db.prepare(
+            `
             UPDATE submissions 
             SET voice_clone_status = ?, elevenlabs_voice_id = NULL, updated_at = CURRENT_TIMESTAMP 
             WHERE id = ?
-          `).run(VOICE_CLONE_STATUS.DELETED, submission.id);
-          
+          `,
+          ).run(VOICE_CLONE_STATUS.DELETED, submission.id);
+
           results.skipped.push({
             submission_id: submission.id,
-            reason: 'Voice not found on ElevenLabs - marked as deleted'
+            reason: "Voice not found on ElevenLabs - marked as deleted",
           });
         } else {
           results.failed.push({
             submission_id: submission.id,
             voice_id: submission.elevenlabs_voice_id,
-            error: deleteError.message
+            error: deleteError.message,
           });
-          logger.error(`[VOICE CLEANUP] Failed to delete voice ${submission.elevenlabs_voice_id}:`, deleteError);
+          logger.error(
+            `[VOICE CLEANUP] Failed to delete voice ${submission.elevenlabs_voice_id}:`,
+            deleteError,
+          );
         }
       }
     }
-    
+
     res.json({
-      message: 'Cleanup completed',
+      message: "Cleanup completed",
       summary: {
         total_eligible: voicesToDelete.length,
         deleted: results.deleted.length,
         failed: results.failed.length,
-        skipped: results.skipped.length
+        skipped: results.skipped.length,
       },
-      results
+      results,
     });
-    
   } catch (error) {
     logger.error("[VOICE CLEANUP] Cleanup failed:", error);
-    res.status(500).json({ error: "Voice cleanup failed", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Voice cleanup failed", details: error.message });
   }
 });
 
@@ -898,82 +914,100 @@ router.post("/cleanup", async (req, res) => {
 router.delete("/cleanup/all", async (req, res) => {
   try {
     const db = getDb();
-    if (req.query.confirm !== 'true') {
+    if (req.query.confirm !== "true") {
       return res.status(400).json({
-        error: 'Confirmation required',
-        message: 'Add ?confirm=true to confirm deletion of ALL active voices'
+        error: "Confirmation required",
+        message: "Add ?confirm=true to confirm deletion of ALL active voices",
       });
     }
-    
-    logger.warn("[VOICE CLEANUP] Emergency cleanup - deleting ALL active voices");
-    
+
+    logger.warn(
+      "[VOICE CLEANUP] Emergency cleanup - deleting ALL active voices",
+    );
+
     // Get all submissions with active voices
-    const activeVoices = db.prepare(`
+    const activeVoices = db
+      .prepare(
+        `
       SELECT id, doctor_name, elevenlabs_voice_id, voice_clone_status
       FROM submissions 
       WHERE elevenlabs_voice_id IS NOT NULL 
         AND voice_clone_status IN (?, ?)
-    `).all(VOICE_CLONE_STATUS.COMPLETED, VOICE_CLONE_STATUS.PENDING);
-    
-    logger.info(`[VOICE CLEANUP] Found ${activeVoices.length} active voices to delete`);
-    
+    `,
+      )
+      .all(VOICE_CLONE_STATUS.COMPLETED, VOICE_CLONE_STATUS.PENDING);
+
+    logger.info(
+      `[VOICE CLEANUP] Found ${activeVoices.length} active voices to delete`,
+    );
+
     const results = {
       deleted: [],
-      failed: []
+      failed: [],
     };
-    
+
     for (const submission of activeVoices) {
       try {
         await elevenLabs.deleteVoice(submission.elevenlabs_voice_id);
-        
-        db.prepare(`
+
+        db.prepare(
+          `
           UPDATE submissions 
           SET voice_clone_status = ?, elevenlabs_voice_id = NULL, updated_at = CURRENT_TIMESTAMP 
           WHERE id = ?
-        `).run(VOICE_CLONE_STATUS.DELETED, submission.id);
-        
+        `,
+        ).run(VOICE_CLONE_STATUS.DELETED, submission.id);
+
         results.deleted.push({
           submission_id: submission.id,
-          voice_id: submission.elevenlabs_voice_id
+          voice_id: submission.elevenlabs_voice_id,
         });
-        
-        logger.info(`[VOICE CLEANUP] Emergency delete: voice ${submission.elevenlabs_voice_id}`);
+
+        logger.info(
+          `[VOICE CLEANUP] Emergency delete: voice ${submission.elevenlabs_voice_id}`,
+        );
       } catch (deleteError) {
         // If not found, still mark as deleted
-        if (deleteError.message?.includes('not found') || deleteError.status === 404) {
-          db.prepare(`
+        if (
+          deleteError.message?.includes("not found") ||
+          deleteError.status === 404
+        ) {
+          db.prepare(
+            `
             UPDATE submissions 
             SET voice_clone_status = ?, elevenlabs_voice_id = NULL, updated_at = CURRENT_TIMESTAMP 
             WHERE id = ?
-          `).run(VOICE_CLONE_STATUS.DELETED, submission.id);
+          `,
+          ).run(VOICE_CLONE_STATUS.DELETED, submission.id);
           results.deleted.push({
             submission_id: submission.id,
             voice_id: submission.elevenlabs_voice_id,
-            note: 'Not found on ElevenLabs'
+            note: "Not found on ElevenLabs",
           });
         } else {
           results.failed.push({
             submission_id: submission.id,
             voice_id: submission.elevenlabs_voice_id,
-            error: deleteError.message
+            error: deleteError.message,
           });
         }
       }
     }
-    
+
     res.json({
-      message: 'Emergency cleanup completed',
+      message: "Emergency cleanup completed",
       summary: {
         total: activeVoices.length,
         deleted: results.deleted.length,
-        failed: results.failed.length
+        failed: results.failed.length,
       },
-      results
+      results,
     });
-    
   } catch (error) {
     logger.error("[VOICE CLEANUP] Emergency cleanup failed:", error);
-    res.status(500).json({ error: "Emergency cleanup failed", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Emergency cleanup failed", details: error.message });
   }
 });
 
@@ -984,7 +1018,9 @@ router.delete("/cleanup/all", async (req, res) => {
 router.get("/active", async (req, res) => {
   try {
     const db = getDb();
-    const activeVoices = db.prepare(`
+    const activeVoices = db
+      .prepare(
+        `
       SELECT 
         s.id,
         s.doctor_name,
@@ -1001,20 +1037,25 @@ router.get("/active", async (req, res) => {
         AND s.voice_clone_status IN (?, ?)
       GROUP BY s.id
       ORDER BY s.updated_at DESC
-    `).all(VOICE_CLONE_STATUS.COMPLETED, VOICE_CLONE_STATUS.PENDING);
-    
+    `,
+      )
+      .all(VOICE_CLONE_STATUS.COMPLETED, VOICE_CLONE_STATUS.PENDING);
+
     // Calculate age for each voice
-    const voicesWithAge = activeVoices.map(v => ({
+    const voicesWithAge = activeVoices.map((v) => ({
       ...v,
-      age_hours: Math.round((Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60)),
-      languages_generated: v.languages_generated ? v.languages_generated.split(',') : []
+      age_hours: Math.round(
+        (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60),
+      ),
+      languages_generated: v.languages_generated
+        ? v.languages_generated.split(",")
+        : [],
     }));
-    
+
     res.json({
       count: activeVoices.length,
-      voices: voicesWithAge
+      voices: voicesWithAge,
     });
-    
   } catch (error) {
     logger.error("[VOICE] List active voices failed:", error);
     res.status(500).json({ error: "Failed to list active voices" });

@@ -269,10 +269,10 @@ if (makePublic) {
 
 #### Model Selection (CRITICAL)
 
-| Use Case | Model ID | Notes |
-|----------|----------|-------|
-| **Speech-to-Speech** | `eleven_multilingual_sts_v2` | Voice conversion/cloning output |
-| **Text-to-Speech** | `eleven_multilingual_v2` | TTS only, does NOT support voice conversion |
+| Use Case             | Model ID                     | Notes                                       |
+| -------------------- | ---------------------------- | ------------------------------------------- |
+| **Speech-to-Speech** | `eleven_multilingual_sts_v2` | Voice conversion/cloning output             |
+| **Text-to-Speech**   | `eleven_multilingual_v2`     | TTS only, does NOT support voice conversion |
 
 **Important**: The `elevenLabsModel` in `constants.js` is for TTS. For speech-to-speech, always use `elevenLabsStsModel` which defaults to `eleven_multilingual_sts_v2`. Using the wrong model will cause "model_can_not_do_voice_conversion" errors.
 
@@ -336,6 +336,7 @@ CSV columns: `name`, `mr_code`, `emp_code`, `phone`, `email`, `designation`, `hq
 | `pa` | Punjabi   |
 
 Each language config includes:
+
 - `elevenLabsModel`: `eleven_multilingual_v2` (for TTS)
 - `elevenLabsStsModel`: `eleven_multilingual_sts_v2` (for speech-to-speech)
 - `voiceSettings`: stability, similarity_boost, style, use_speaker_boost
@@ -346,12 +347,12 @@ Each language config includes:
 
 Defined in `backend/utils/constants.js`:
 
-| Constant | Value | Purpose |
-|----------|-------|--------|
-| `AUDIO_MIN_DURATION_SECONDS` | 60 | Minimum audio sample duration |
-| `AUDIO_MAX_FILES` | 5 | Max audio files per submission |
-| `AUDIO_MIN_SAMPLE_RATE` | 44100 | Minimum sample rate (Hz) |
-| `MAX_CONSENT_ATTEMPTS` | 3 | Max OTP verification attempts |
+| Constant                     | Value | Purpose                        |
+| ---------------------------- | ----- | ------------------------------ |
+| `AUDIO_MIN_DURATION_SECONDS` | 60    | Minimum audio sample duration  |
+| `AUDIO_MAX_FILES`            | 5     | Max audio files per submission |
+| `AUDIO_MIN_SAMPLE_RATE`      | 44100 | Minimum sample rate (Hz)       |
+| `MAX_CONSENT_ATTEMPTS`       | 3     | Max OTP verification attempts  |
 
 ---
 
@@ -373,6 +374,7 @@ Endpoint: `POST /api/voice/process/:submissionId`
 ```
 
 **Key files:**
+
 - `backend/routes/voice.js` - Processing endpoint
 - `backend/services/elevenlabs.js` - ElevenLabs API wrapper
 - `backend/services/gcsService.js` - GCS upload/download

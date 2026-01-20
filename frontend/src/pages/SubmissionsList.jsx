@@ -171,7 +171,9 @@ export default function SubmissionsList() {
               type="text"
               placeholder="Search by name, email, MR code, or ID..."
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, search: e.target.value }))
+              }
               onKeyPress={handleKeyPress}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-sunpharma-blue outline-none"
             />
@@ -282,7 +284,8 @@ export default function SubmissionsList() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {LANGUAGE_NAMES[entry.language_code] || entry.language_code}
+                        {LANGUAGE_NAMES[entry.language_code] ||
+                          entry.language_code}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -356,7 +359,8 @@ export default function SubmissionsList() {
         {pagination.totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Page {pagination.page} of {pagination.totalPages} ({pagination.total} entries)
+              Page {pagination.page} of {pagination.totalPages} (
+              {pagination.total} entries)
             </div>
             <div className="flex gap-2">
               <button
@@ -393,10 +397,16 @@ function StatusBadge({ status }) {
       class: "bg-yellow-100 text-yellow-800",
     },
     consent_verified: { label: "Verified", class: "bg-blue-100 text-blue-800" },
-    voice_ready: { label: "Voice Ready", class: "bg-purple-100 text-purple-800" },
+    voice_ready: {
+      label: "Voice Ready",
+      class: "bg-purple-100 text-purple-800",
+    },
     processing: { label: "Processing", class: "bg-indigo-100 text-indigo-800" },
     audio_ready: { label: "Audio Ready", class: "bg-cyan-100 text-cyan-800" },
-    video_ready: { label: "Video Ready", class: "bg-emerald-100 text-emerald-800" },
+    video_ready: {
+      label: "Video Ready",
+      class: "bg-emerald-100 text-emerald-800",
+    },
     completed: { label: "Completed", class: "bg-green-100 text-green-800" },
     failed: { label: "Failed", class: "bg-red-100 text-red-800" },
   };

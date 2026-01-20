@@ -93,7 +93,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}-${Date.now()}${path.extname(
-      file.originalname
+      file.originalname,
     )}`;
     cb(null, uniqueName);
   },
@@ -107,10 +107,10 @@ const fileFilter = (req, file, cb) => {
       cb(
         new Error(
           `Invalid image format. Allowed: ${UPLOAD_CONFIG.IMAGE.allowedExtensions.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         ),
-        false
+        false,
       );
     }
   } else if (file.fieldname === "audio") {
@@ -120,10 +120,10 @@ const fileFilter = (req, file, cb) => {
       cb(
         new Error(
           `Invalid audio format. Allowed: ${UPLOAD_CONFIG.AUDIO.allowedExtensions.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         ),
-        false
+        false,
       );
     }
   } else {
@@ -137,7 +137,7 @@ const upload = multer({
   limits: {
     fileSize: Math.max(
       UPLOAD_CONFIG.IMAGE.maxSizeBytes,
-      UPLOAD_CONFIG.AUDIO.maxSizeBytes
+      UPLOAD_CONFIG.AUDIO.maxSizeBytes,
     ),
   },
 });
@@ -294,7 +294,14 @@ router.get("/", async (req, res) => {
 router.get("/by-language", async (req, res) => {
   try {
     const db = getDb();
-    const { page = 1, limit = 30, status, qc_status, language, search } = req.query;
+    const {
+      page = 1,
+      limit = 30,
+      status,
+      qc_status,
+      language,
+      search,
+    } = req.query;
     const offset = (page - 1) * limit;
 
     // Get all submissions with their data
@@ -315,7 +322,8 @@ router.get("/by-language", async (req, res) => {
     }
 
     if (search) {
-      baseQuery += " AND (d.full_name LIKE ? OR d.email LIKE ? OR m.mr_code LIKE ? OR s.id = ?)";
+      baseQuery +=
+        " AND (d.full_name LIKE ? OR d.email LIKE ? OR m.mr_code LIKE ? OR s.id = ?)";
       const searchPattern = `%${search}%`;
       params.push(searchPattern, searchPattern, searchPattern, search);
     }
@@ -325,71 +333,127 @@ router.get("/by-language", async (req, res) => {
     const submissions = db.prepare(baseQuery).all(...params);
 
     // Get all generated_audio and generated_videos for these submissions
-    const submissionIds = submissions.map(s => s.id);
-    
+    const submissionIds = submissions.map((s) => s.id);
+
     let audioData = [];
     let videoData = [];
-    
-    if (submissionIds.length > 0) {
-      const placeholders = submissionIds.map(() => '?').join(',');
-      
-      audioData = db.prepare(`
-        SELECT submission_id, language_code, status, qc_status, qc_notes, 
-               created_at, updated_at, gcs_path, public_url
-        FROM generated_audio
-        WHERE submission_id IN (${placeholders})
-      `).all(...submissionIds);
 
-      videoData = db.prepare(`
-        SELECT submission_id, language_code, status, qc_status, qc_notes,
-               created_at, updated_at, gcs_path, public_url
-        FROM generated_videos
-        WHERE submission_id IN (${placeholders})
-      `).all(...submissionIds);
+    if (submissionIds.length > 0) {
+      const placeholders = submissionIds.map(() => "?").join(",");
+
+      try {
+        audioData = db
+          .prepare(
+            `
+          SELECT submission_id, language_code, status, qc_status, qc_notes, 
+                 created_at, updated_at, gcs_path, public_url
+          FROM generated_audio
+          WHERE submission_id IN (${placeholders})
+        `,
+          )
+          .all(...submissionIds);
+      } catch (e) {
+        logger.warn("Error fetching generated_audio, trying without public_url:", e.message);
+        audioData = db
+          .prepare(
+            `
+          SELECT submission_id, language_code, status, qc_status, qc_notes, 
+                 created_at, updated_at, gcs_path
+          FROM generated_audio
+          WHERE submission_id IN (${placeholders})
+        `,
+          )
+          .all(...submissionIds);
+      }
+
+      try {
+        videoData = db
+          .prepare(
+            `
+          SELECT submission_id, language_code, status, qc_status, qc_notes,
+                 created_at, updated_at, gcs_path, public_url, video_url
+          FROM generated_videos
+          WHERE submission_id IN (${placeholders})
+        `,
+          )
+          .all(...submissionIds);
+      } catch (e) {
+        logger.warn("Error fetching generated_videos with public_url, trying basic columns:", e.message);
+        try {
+          videoData = db
+            .prepare(
+              `
+            SELECT submission_id, language_code, status, qc_status, qc_notes,
+                   created_at, updated_at, gcs_path
+            FROM generated_videos
+            WHERE submission_id IN (${placeholders})
+          `,
+            )
+            .all(...submissionIds);
+        } catch (e2) {
+          logger.warn("Error fetching generated_videos, trying without qc columns:", e2.message);
+          videoData = db
+            .prepare(
+              `
+            SELECT submission_id, language_code, status, created_at, updated_at, gcs_path
+            FROM generated_videos
+            WHERE submission_id IN (${placeholders})
+          `,
+            )
+            .all(...submissionIds);
+        }
+      }
     }
 
     // Create lookup maps
     const audioBySubmissionLang = {};
-    audioData.forEach(a => {
+    audioData.forEach((a) => {
       const key = `${a.submission_id}-${a.language_code}`;
       audioBySubmissionLang[key] = a;
     });
 
     const videoBySubmissionLang = {};
-    videoData.forEach(v => {
+    videoData.forEach((v) => {
       const key = `${v.submission_id}-${v.language_code}`;
       videoBySubmissionLang[key] = v;
     });
 
     // Expand submissions by language
     let expandedRows = [];
-    submissions.forEach(sub => {
-      const langs = JSON.parse(sub.selected_languages || "[]");
-      langs.forEach(langCode => {
+    submissions.forEach((sub) => {
+      let langs = [];
+      try {
+        langs = JSON.parse(sub.selected_languages || "[]");
+        if (!Array.isArray(langs)) langs = [];
+      } catch (e) {
+        logger.warn(`Invalid selected_languages JSON for submission ${sub.id}:`, sub.selected_languages);
+        langs = [];
+      }
+      langs.forEach((langCode) => {
         const key = `${sub.id}-${langCode}`;
         const audio = audioBySubmissionLang[key];
         const video = videoBySubmissionLang[key];
 
         // Determine per-language status
-        let langStatus = 'pending';
-        let langQcStatus = 'pending';
+        let langStatus = "pending";
+        let langQcStatus = "pending";
 
-        if (video?.status === 'completed') {
-          langStatus = 'video_ready';
-          langQcStatus = video.qc_status || 'pending';
-        } else if (audio?.status === 'completed') {
-          langStatus = 'audio_ready';
-          langQcStatus = audio.qc_status || 'pending';
-        } else if (audio?.status === 'processing') {
-          langStatus = 'processing';
-        } else if (sub.voice_clone_status === 'completed') {
-          langStatus = 'voice_ready';
-        } else if (sub.status === 'consent_verified') {
-          langStatus = 'consent_verified';
-        } else if (sub.status === 'pending_consent') {
-          langStatus = 'pending_consent';
-        } else if (sub.status === 'failed') {
-          langStatus = 'failed';
+        if (video?.status === "completed") {
+          langStatus = "video_ready";
+          langQcStatus = video.qc_status || "pending";
+        } else if (audio?.status === "completed") {
+          langStatus = "audio_ready";
+          langQcStatus = audio.qc_status || "pending";
+        } else if (audio?.status === "processing") {
+          langStatus = "processing";
+        } else if (sub.voice_clone_status === "completed") {
+          langStatus = "voice_ready";
+        } else if (sub.status === "consent_verified") {
+          langStatus = "consent_verified";
+        } else if (sub.status === "pending_consent") {
+          langStatus = "pending_consent";
+        } else if (sub.status === "failed") {
+          langStatus = "failed";
         }
 
         expandedRows.push({
@@ -404,23 +468,23 @@ router.get("/by-language", async (req, res) => {
           submission_status: sub.status,
           language_status: langStatus,
           qc_status: langQcStatus,
-          qc_notes: video?.qc_notes || audio?.qc_notes || '',
-          video_url: video?.public_url || '',
-          audio_url: audio?.public_url || '',
+          qc_notes: video?.qc_notes || audio?.qc_notes || "",
+          video_url: video?.public_url || video?.video_url || video?.gcs_path || "",
+          audio_url: audio?.public_url || audio?.gcs_path || "",
           created_at: sub.created_at,
-          updated_at: video?.updated_at || audio?.updated_at || sub.updated_at
+          updated_at: video?.updated_at || audio?.updated_at || sub.updated_at,
         });
       });
     });
 
     // Apply language filter
     if (language) {
-      expandedRows = expandedRows.filter(r => r.language_code === language);
+      expandedRows = expandedRows.filter((r) => r.language_code === language);
     }
 
     // Apply QC status filter
     if (qc_status) {
-      expandedRows = expandedRows.filter(r => r.qc_status === qc_status);
+      expandedRows = expandedRows.filter((r) => r.qc_status === qc_status);
     }
 
     // Get total count before pagination
@@ -464,7 +528,7 @@ router.get("/:id", async (req, res) => {
       LEFT JOIN doctors d ON s.doctor_id = d.id
       LEFT JOIN medical_reps m ON s.mr_id = m.id
       WHERE s.id = ?
-    `
+    `,
       )
       .get(id);
 
@@ -477,7 +541,7 @@ router.get("/:id", async (req, res) => {
       .prepare(
         `
       SELECT * FROM generated_audio WHERE submission_id = ?
-    `
+    `,
       )
       .all(id);
 
@@ -486,7 +550,7 @@ router.get("/:id", async (req, res) => {
       .prepare(
         `
       SELECT * FROM generated_videos WHERE submission_id = ?
-    `
+    `,
       )
       .all(id);
 
@@ -495,7 +559,7 @@ router.get("/:id", async (req, res) => {
       .prepare(
         `
       SELECT * FROM image_validations WHERE submission_id = ? ORDER BY validated_at DESC LIMIT 1
-    `
+    `,
       )
       .get(id);
 
@@ -503,7 +567,7 @@ router.get("/:id", async (req, res) => {
       .prepare(
         `
       SELECT * FROM audio_validations WHERE submission_id = ? ORDER BY validated_at DESC LIMIT 1
-    `
+    `,
       )
       .get(id);
 
@@ -610,7 +674,7 @@ router.post(
 
       const langValidation = validateLanguageCodes(
         languages,
-        MAX_LANGUAGE_SELECTIONS
+        MAX_LANGUAGE_SELECTIONS,
       );
       if (!langValidation.isValid) {
         return res.status(400).json({ errors: langValidation.errors });
@@ -640,7 +704,7 @@ router.post(
         // Clean up uploaded files
         fs.unlinkSync(imageFile.path);
         audioFiles.forEach(
-          (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path)
+          (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path),
         );
         return res.status(400).json({
           error: "Image validation failed",
@@ -671,7 +735,7 @@ router.post(
           // Clean up all files
           fs.unlinkSync(imageFile.path);
           audioFiles.forEach(
-            (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path)
+            (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path),
           );
           return res.status(400).json({
             error: `Audio file "${audioFile.originalname}" is too short. Minimum 1 minute required.`,
@@ -682,7 +746,7 @@ router.post(
         if (!audioValidation.isValid) {
           fs.unlinkSync(imageFile.path);
           audioFiles.forEach(
-            (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path)
+            (f) => fs.existsSync(f.path) && fs.unlinkSync(f.path),
           );
           return res.status(400).json({
             error: `Audio validation failed for "${audioFile.originalname}"`,
@@ -742,7 +806,7 @@ router.post(
           specialty,
           years_of_practice || null,
           clinic_name || null,
-          address || null
+          address || null,
         );
         const doctorId = doctorResult.lastInsertRowid;
 
@@ -773,7 +837,7 @@ router.post(
           state || null,
           campaign_name || null,
           mr_name || null,
-          mr_code || null
+          mr_code || null,
         );
         const submissionId = submissionResult.lastInsertRowid;
 
@@ -787,7 +851,7 @@ router.post(
           imageValidation.checks.plainBackground ? 1 : 0,
           imageValidation.checks.resolution ? 1 : 0,
           imageValidation.checks.noOcclusion ? 1 : 0,
-          JSON.stringify(imageValidation)
+          JSON.stringify(imageValidation),
         );
 
         // Store validation for each audio file
@@ -801,7 +865,7 @@ router.post(
             av.details?.durationSeconds || null,
             av.details?.format || null,
             av.details?.sampleRate || null,
-            JSON.stringify(av)
+            JSON.stringify(av),
           );
         }
 
@@ -811,7 +875,7 @@ router.post(
       const result = transaction();
 
       logger.info(
-        `[SUBMISSION] New submission created: ${result.submissionId} with ${audioFiles.length} audio files`
+        `[SUBMISSION] New submission created: ${result.submissionId} with ${audioFiles.length} audio files`,
       );
 
       // Sync to Google Sheets (async, non-blocking)
@@ -836,7 +900,7 @@ router.post(
       googleSheetsService.syncSubmission(submissionData).catch((err) => {
         logger.error(
           `[SHEETS] Failed to sync submission ${result.submissionId}:`,
-          err
+          err,
         );
       });
 
@@ -867,7 +931,7 @@ router.post(
       }
       res.status(500).json({ error: "Failed to create submission" });
     }
-  }
+  },
 );
 
 /**
@@ -954,7 +1018,7 @@ router.post(
 
       const langValidation = validateLanguageCodes(
         languages,
-        MAX_LANGUAGE_SELECTIONS
+        MAX_LANGUAGE_SELECTIONS,
       );
       if (!langValidation.isValid) {
         return res.status(400).json({ errors: langValidation.errors });
@@ -1010,7 +1074,7 @@ router.post(
           specialty,
           years_of_practice || null,
           clinic_name || null,
-          address || null
+          address || null,
         );
         const doctorId = doctorResult.lastInsertRowid;
 
@@ -1043,7 +1107,7 @@ router.post(
           mr_code || null,
           image_public_url, // Store public URL for easy access
           submission_prefix, // Store the GCS prefix for this submission
-          "gcs" // Mark this as a GCS upload
+          "gcs", // Mark this as a GCS upload
         );
         const submissionId = submissionResult.lastInsertRowid;
 
@@ -1053,7 +1117,7 @@ router.post(
       const result = transaction();
 
       logger.info(
-        `[SUBMISSION] New GCS submission created: ${result.submissionId} with ${audio_gcs_paths.length} audio files`
+        `[SUBMISSION] New GCS submission created: ${result.submissionId} with ${audio_gcs_paths.length} audio files`,
       );
 
       // Sync to Google Sheets (async, non-blocking)
@@ -1079,7 +1143,7 @@ router.post(
       googleSheetsService.syncSubmission(submissionData).catch((err) => {
         logger.error(
           `[SHEETS] Failed to sync GCS submission ${result.submissionId}:`,
-          err
+          err,
         );
       });
 
@@ -1098,7 +1162,7 @@ router.post(
       logger.error("Error creating GCS submission:", error);
       res.status(500).json({ error: "Failed to create submission" });
     }
-  }
+  },
 );
 
 /**
@@ -1151,14 +1215,14 @@ router.post(
             qc_status = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `
+      `,
       ).run(
         gcsPath,
         finalPublicUrl,
         uploadedBy || "editor",
         newStatus,
         newQcStatus,
-        id
+        id,
       );
 
       logger.info(`[SUBMISSION] Final video attached for submission ${id}`);
@@ -1174,7 +1238,7 @@ router.post(
       logger.error("Error saving final video:", error);
       res.status(500).json({ error: "Failed to save final video" });
     }
-  }
+  },
 );
 
 /**
@@ -1214,7 +1278,7 @@ router.put(
       if (updates.selected_languages) {
         const langValidation = validateLanguageCodes(
           updates.selected_languages,
-          MAX_LANGUAGE_SELECTIONS
+          MAX_LANGUAGE_SELECTIONS,
         );
         if (!langValidation.isValid) {
           return res.status(400).json({ errors: langValidation.errors });
@@ -1233,7 +1297,7 @@ router.put(
       db.prepare(
         `
         UPDATE submissions SET ${updateFields.join(", ")} WHERE id = ?
-      `
+      `,
       ).run(...params);
 
       res.json({ message: "Submission updated successfully" });
@@ -1241,7 +1305,7 @@ router.put(
       logger.error("Error updating submission:", error);
       res.status(500).json({ error: "Failed to update submission" });
     }
-  }
+  },
 );
 
 /**
@@ -1302,7 +1366,7 @@ router.get("/stats/overview", async (req, res) => {
         SUM(CASE WHEN qc_status = 'approved' THEN 1 ELSE 0 END) as qc_approved,
         SUM(CASE WHEN qc_status = 'rejected' THEN 1 ELSE 0 END) as qc_rejected
       FROM submissions
-    `
+    `,
       )
       .get();
 
@@ -1345,29 +1409,36 @@ router.post(
       }
 
       // Verify language is in submission's selected languages
-      const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
+      const selectedLanguages = JSON.parse(
+        submission.selected_languages || "[]",
+      );
       if (!selectedLanguages.includes(languageCode)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: `Language ${languageCode} is not in submission's selected languages`,
-          selected_languages: selectedLanguages
+          selected_languages: selectedLanguages,
         });
       }
 
       // Get generated audio for this language (if exists)
       const generatedAudio = db
-        .prepare("SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?")
+        .prepare(
+          "SELECT id FROM generated_audio WHERE submission_id = ? AND language_code = ?",
+        )
         .get(id, languageCode);
 
       const finalPublicUrl = publicUrl || toPublicUrlFromGcs(gcsPath);
 
       // Check if video already exists for this language
       const existingVideo = db
-        .prepare("SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?")
+        .prepare(
+          "SELECT id FROM generated_videos WHERE submission_id = ? AND language_code = ?",
+        )
         .get(id, languageCode);
 
       if (existingVideo) {
         // Update existing video
-        db.prepare(`
+        db.prepare(
+          `
           UPDATE generated_videos 
           SET gcs_path = ?,
               file_path = ?,
@@ -1376,52 +1447,66 @@ router.post(
               error_message = NULL,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(
+        `,
+        ).run(
           gcsPath,
           finalPublicUrl, // store public URL in file_path for backwards compatibility
           duration_seconds || null,
-          existingVideo.id
+          existingVideo.id,
         );
 
-        logger.info(`[SUBMISSION] Updated video for submission ${id}, language: ${languageCode}`);
+        logger.info(
+          `[SUBMISSION] Updated video for submission ${id}, language: ${languageCode}`,
+        );
       } else {
         // Insert new video record
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO generated_videos (
             submission_id, language_code, generated_audio_id,
             file_path, gcs_path, duration_seconds, status
           )
           VALUES (?, ?, ?, ?, ?, ?, 'completed')
-        `).run(
+        `,
+        ).run(
           id,
           languageCode,
           generatedAudio?.id || null,
           finalPublicUrl,
           gcsPath,
-          duration_seconds || null
+          duration_seconds || null,
         );
 
-        logger.info(`[SUBMISSION] Registered video for submission ${id}, language: ${languageCode}`);
+        logger.info(
+          `[SUBMISSION] Registered video for submission ${id}, language: ${languageCode}`,
+        );
       }
 
       // Check if all languages have videos and update submission status
-      const completedVideos = db.prepare(`
+      const completedVideos = db
+        .prepare(
+          `
         SELECT COUNT(DISTINCT language_code) as count 
         FROM generated_videos 
         WHERE submission_id = ? AND status = 'completed'
-      `).get(id);
+      `,
+        )
+        .get(id);
 
-      const allVideosComplete = completedVideos.count >= selectedLanguages.length;
+      const allVideosComplete =
+        completedVideos.count >= selectedLanguages.length;
 
       // Update submission status if all videos are complete
       if (allVideosComplete) {
-        db.prepare(`
+        db.prepare(
+          `
           UPDATE submissions 
           SET status = ?, 
               qc_status = CASE WHEN qc_status = 'approved' THEN qc_status ELSE 'pending' END,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(SUBMISSION_STATUS.PENDING_QC, id);
+        `,
+        ).run(SUBMISSION_STATUS.PENDING_QC, id);
       }
 
       res.json({
@@ -1431,13 +1516,13 @@ router.post(
         video_url: finalPublicUrl,
         all_videos_complete: allVideosComplete,
         videos_completed: completedVideos.count,
-        total_languages: selectedLanguages.length
+        total_languages: selectedLanguages.length,
       });
     } catch (error) {
       logger.error(`Error saving video for language ${languageCode}:`, error);
       res.status(500).json({ error: "Failed to save video" });
     }
-  }
+  },
 );
 
 /**
@@ -1460,62 +1545,75 @@ router.get("/:id/languages", async (req, res) => {
     const selectedLanguages = JSON.parse(submission.selected_languages || "[]");
 
     // Get all generated audio for this submission
-    const generatedAudio = db.prepare(`
+    const generatedAudio = db
+      .prepare(
+        `
       SELECT ga.*, am.title as audio_master_title, am.language_code as audio_master_language
       FROM generated_audio ga
       LEFT JOIN audio_masters am ON ga.audio_master_id = am.id
       WHERE ga.submission_id = ?
-    `).all(id);
+    `,
+      )
+      .all(id);
 
     // Get all generated videos for this submission
-    const generatedVideos = db.prepare(`
+    const generatedVideos = db
+      .prepare(
+        `
       SELECT * FROM generated_videos WHERE submission_id = ?
-    `).all(id);
+    `,
+      )
+      .all(id);
 
     // Build per-language status
-    const languageStatus = selectedLanguages.map(langCode => {
-      const audio = generatedAudio.find(a => a.language_code === langCode);
-      const video = generatedVideos.find(v => v.language_code === langCode);
+    const languageStatus = selectedLanguages.map((langCode) => {
+      const audio = generatedAudio.find((a) => a.language_code === langCode);
+      const video = generatedVideos.find((v) => v.language_code === langCode);
 
       return {
         language_code: langCode,
-        audio: audio ? {
-          id: audio.id,
-          status: audio.status,
-          file_path: audio.file_path,
-          gcs_path: audio.gcs_path,
-          public_url: audio.public_url,
-          audio_master_title: audio.audio_master_title,
-          created_at: audio.created_at,
-          error_message: audio.error_message
-        } : null,
-        video: video ? {
-          id: video.id,
-          status: video.status,
-          file_path: video.file_path,
-          gcs_path: video.gcs_path,
-          duration_seconds: video.duration_seconds,
-          created_at: video.created_at,
-          error_message: video.error_message
-        } : null,
-        audio_complete: audio?.status === 'completed',
-        video_complete: video?.status === 'completed',
-        ready_for_qc: audio?.status === 'completed' && video?.status === 'completed'
+        audio: audio
+          ? {
+              id: audio.id,
+              status: audio.status,
+              file_path: audio.file_path,
+              gcs_path: audio.gcs_path,
+              public_url: audio.public_url,
+              audio_master_title: audio.audio_master_title,
+              created_at: audio.created_at,
+              error_message: audio.error_message,
+            }
+          : null,
+        video: video
+          ? {
+              id: video.id,
+              status: video.status,
+              file_path: video.file_path,
+              gcs_path: video.gcs_path,
+              duration_seconds: video.duration_seconds,
+              created_at: video.created_at,
+              error_message: video.error_message,
+            }
+          : null,
+        audio_complete: audio?.status === "completed",
+        video_complete: video?.status === "completed",
+        ready_for_qc:
+          audio?.status === "completed" && video?.status === "completed",
       };
     });
 
     const summary = {
       total_languages: selectedLanguages.length,
-      audio_completed: languageStatus.filter(l => l.audio_complete).length,
-      videos_completed: languageStatus.filter(l => l.video_complete).length,
-      ready_for_qc: languageStatus.filter(l => l.ready_for_qc).length,
-      all_complete: languageStatus.every(l => l.ready_for_qc)
+      audio_completed: languageStatus.filter((l) => l.audio_complete).length,
+      videos_completed: languageStatus.filter((l) => l.video_complete).length,
+      ready_for_qc: languageStatus.filter((l) => l.ready_for_qc).length,
+      all_complete: languageStatus.every((l) => l.ready_for_qc),
     };
 
     res.json({
       submission_id: id,
       summary,
-      languages: languageStatus
+      languages: languageStatus,
     });
   } catch (error) {
     logger.error("Error fetching language status:", error);
@@ -1533,11 +1631,15 @@ router.delete("/:id/video/:languageCode", async (req, res) => {
 
   try {
     const video = db
-      .prepare("SELECT * FROM generated_videos WHERE submission_id = ? AND language_code = ?")
+      .prepare(
+        "SELECT * FROM generated_videos WHERE submission_id = ? AND language_code = ?",
+      )
       .get(id, languageCode);
 
     if (!video) {
-      return res.status(404).json({ error: "Video not found for this language" });
+      return res
+        .status(404)
+        .json({ error: "Video not found for this language" });
     }
 
     // Delete from GCS if path exists
@@ -1552,12 +1654,14 @@ router.delete("/:id/video/:languageCode", async (req, res) => {
     // Delete from database
     db.prepare("DELETE FROM generated_videos WHERE id = ?").run(video.id);
 
-    logger.info(`[SUBMISSION] Deleted video for submission ${id}, language: ${languageCode}`);
+    logger.info(
+      `[SUBMISSION] Deleted video for submission ${id}, language: ${languageCode}`,
+    );
 
     res.json({
       message: "Video deleted",
       submission_id: id,
-      language_code: languageCode
+      language_code: languageCode,
     });
   } catch (error) {
     logger.error(`Error deleting video for language ${languageCode}:`, error);

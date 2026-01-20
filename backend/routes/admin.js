@@ -43,7 +43,7 @@ router.get("/dashboard", async (req, res) => {
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
         COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
       FROM submissions
-    `
+    `,
       )
       .get();
 
@@ -56,7 +56,7 @@ router.get("/dashboard", async (req, res) => {
         COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as approved,
         COUNT(CASE WHEN qc_status = 'rejected' THEN 1 END) as rejected
       FROM submissions
-    `
+    `,
       )
       .get();
 
@@ -70,7 +70,7 @@ router.get("/dashboard", async (req, res) => {
         COUNT(CASE WHEN voice_clone_status = 'deleted' THEN 1 END) as deleted,
         COUNT(CASE WHEN voice_clone_status = 'failed' THEN 1 END) as failed
       FROM submissions
-    `
+    `,
       )
       .get();
 
@@ -84,7 +84,7 @@ router.get("/dashboard", async (req, res) => {
         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count
       FROM audio_masters
       GROUP BY language_code
-    `
+    `,
       )
       .all();
 
@@ -98,7 +98,7 @@ router.get("/dashboard", async (req, res) => {
       LEFT JOIN doctors d ON s.doctor_id = d.id
       ORDER BY s.created_at DESC
       LIMIT 10
-    `
+    `,
       )
       .all();
 
@@ -112,7 +112,7 @@ router.get("/dashboard", async (req, res) => {
         COUNT(CASE WHEN DATE(consent_verified_at) = ? THEN 1 END) as consents_today,
         COUNT(CASE WHEN DATE(qc_reviewed_at) = ? THEN 1 END) as qc_reviews_today
       FROM submissions
-    `
+    `,
       )
       .get(today, today, today);
 
@@ -121,7 +121,7 @@ router.get("/dashboard", async (req, res) => {
       .prepare(
         `
       SELECT selected_languages FROM submissions
-    `
+    `,
       )
       .all();
 
@@ -226,7 +226,7 @@ router.get("/medical-reps", async (req, res) => {
         (SELECT COUNT(*) FROM submissions WHERE mr_id = mr.id) as submission_count
       FROM medical_reps mr
       ORDER BY mr.name
-    `
+    `,
       )
       .all();
 
@@ -272,7 +272,7 @@ router.post(
           `
         INSERT INTO medical_reps (name, mr_code, phone, email)
         VALUES (?, ?, ?, ?)
-      `
+      `,
         )
         .run(name, mr_code, phone, email);
 
@@ -288,7 +288,7 @@ router.post(
         .status(500)
         .json({ error: "Failed to create medical representative" });
     }
-  }
+  },
 );
 
 /**
@@ -317,7 +317,7 @@ router.post(
           `
         SELECT * FROM medical_reps 
         WHERE LOWER(email) = LOWER(?) AND LOWER(emp_code) = LOWER(?) AND is_active = 1
-      `
+      `,
         )
         .get(email, emp_code);
 
@@ -346,7 +346,7 @@ router.post(
       logger.error("[ADMIN] Error during MR login:", error);
       res.status(500).json({ error: "Login failed" });
     }
-  }
+  },
 );
 
 /**
@@ -371,7 +371,7 @@ router.post("/import-mrs", async (req, res) => {
         // Check if MR already exists by mr_code or email
         const existing = db
           .prepare(
-            "SELECT id FROM medical_reps WHERE mr_code = ? OR LOWER(email) = LOWER(?)"
+            "SELECT id FROM medical_reps WHERE mr_code = ? OR LOWER(email) = LOWER(?)",
           )
           .get(mr.emp_code, mr.email);
 
@@ -381,7 +381,7 @@ router.post("/import-mrs", async (req, res) => {
             `UPDATE medical_reps SET 
               name = ?, mr_code = ?, emp_code = ?, phone = ?, email = ?, 
               designation = ?, hq = ?, region = ?, zone = ?
-            WHERE id = ?`
+            WHERE id = ?`,
           ).run(
             mr.name,
             mr.emp_code, // Using emp_code as mr_code
@@ -392,14 +392,14 @@ router.post("/import-mrs", async (req, res) => {
             mr.hq || "",
             mr.region || "",
             mr.zone || "",
-            existing.id
+            existing.id,
           );
           skipped++;
         } else {
           // Insert new record
           db.prepare(
             `INSERT INTO medical_reps (name, mr_code, emp_code, phone, email, designation, hq, region, zone)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           ).run(
             mr.name,
             mr.emp_code, // Using emp_code as mr_code
@@ -409,7 +409,7 @@ router.post("/import-mrs", async (req, res) => {
             mr.designation || "",
             mr.hq || "",
             mr.region || "",
-            mr.zone || ""
+            mr.zone || "",
           );
           imported++;
         }
@@ -419,7 +419,7 @@ router.post("/import-mrs", async (req, res) => {
     }
 
     logger.info(
-      `[ADMIN] MR import: ${imported} imported, ${skipped} updated, ${errors.length} errors`
+      `[ADMIN] MR import: ${imported} imported, ${skipped} updated, ${errors.length} errors`,
     );
 
     res.json({
@@ -548,7 +548,7 @@ router.post(
                     qc_reviewed_by = ?, qc_reviewed_at = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-              `
+              `,
               ).run(actor, id);
               break;
 
@@ -560,7 +560,7 @@ router.post(
                     qc_reviewed_by = ?, qc_reviewed_at = CURRENT_TIMESTAMP,
                     qc_notes = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-              `
+              `,
               ).run(actor, notes || "Bulk rejection", id);
               break;
 
@@ -570,7 +570,7 @@ router.post(
                 UPDATE submissions 
                 SET status = 'consent_verified', updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND status = 'failed'
-              `
+              `,
               ).run(id);
               break;
 
@@ -581,7 +581,7 @@ router.post(
                 UPDATE submissions 
                 SET status = 'deleted', updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-              `
+              `,
               ).run(id);
               break;
           }
@@ -591,13 +591,13 @@ router.post(
             `
             INSERT INTO audit_log (entity_type, entity_id, action, actor, details)
             VALUES (?, ?, ?, ?, ?)
-          `
+          `,
           ).run(
             "submission",
             id,
             `bulk_${action}`,
             actor,
-            JSON.stringify({ notes })
+            JSON.stringify({ notes }),
           );
 
           results.success.push(id);
@@ -607,7 +607,7 @@ router.post(
       }
 
       logger.info(
-        `[ADMIN] Bulk action ${action} by ${actor}: ${results.success.length} success, ${results.failed.length} failed`
+        `[ADMIN] Bulk action ${action} by ${actor}: ${results.success.length} success, ${results.failed.length} failed`,
       );
 
       res.json({
@@ -618,7 +618,7 @@ router.post(
       logger.error("[ADMIN] Error performing bulk action:", error);
       res.status(500).json({ error: "Failed to perform bulk action" });
     }
-  }
+  },
 );
 
 /**
@@ -698,7 +698,7 @@ router.get("/export", async (req, res) => {
       res.setHeader("Content-Type", "text/csv");
       res.setHeader(
         "Content-Disposition",
-        "attachment; filename=submissions_export.csv"
+        "attachment; filename=submissions_export.csv",
       );
       return res.send(csv);
     }
@@ -786,7 +786,7 @@ router.post("/sync-sheets", async (req, res) => {
         LEFT JOIN doctors d ON s.doctor_id = d.id
         LEFT JOIN medical_reps m ON s.mr_id = m.id
         ORDER BY s.created_at DESC
-      `
+      `,
         )
         .all();
     };
@@ -797,7 +797,7 @@ router.post("/sync-sheets", async (req, res) => {
         .prepare(
           `
         SELECT * FROM generated_videos WHERE submission_id = ?
-      `
+      `,
         )
         .all(submissionId);
     };
@@ -808,7 +808,7 @@ router.post("/sync-sheets", async (req, res) => {
         .prepare(
           `
         SELECT * FROM generated_audio WHERE submission_id = ?
-      `
+      `,
         )
         .all(submissionId);
     };
@@ -816,7 +816,7 @@ router.post("/sync-sheets", async (req, res) => {
     const success = await googleSheetsService.syncAllSubmissions(
       getSubmissions,
       getVideos,
-      getAudios
+      getAudios,
     );
 
     if (success) {
@@ -849,6 +849,8 @@ router.post("/login", async (req, res) => {
   const ADMIN_PASSWORD = "ADMIN@Sun_Pharma";
   const EDITOR_USERNAME = "EDITOR";
   const EDITOR_PASSWORD = "EDITOR@Sun_Pharma";
+  const VIEWER_USERNAME = "Admin_SP";
+  const VIEWER_PASSWORD = "Admin_SP";
 
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
     logger.info("[ADMIN] Admin login successful");
@@ -866,6 +868,16 @@ router.post("/login", async (req, res) => {
       success: true,
       message: "Login successful",
       user: { username: "EDITOR", role: "editor" },
+    });
+    return;
+  }
+
+  if (username === VIEWER_USERNAME && password === VIEWER_PASSWORD) {
+    logger.info("[ADMIN] Viewer (Admin_SP) login successful");
+    res.json({
+      success: true,
+      message: "Login successful",
+      user: { username: "Admin_SP", role: "viewer" },
     });
     return;
   }
@@ -923,7 +935,7 @@ router.get("/overall-data", async (req, res) => {
     const submissionsWithVideos = submissions.map((sub) => {
       const videos = db
         .prepare(
-          "SELECT language_code, gcs_path as video_url, status FROM generated_videos WHERE submission_id = ?"
+          "SELECT language_code, gcs_path as video_url, status FROM generated_videos WHERE submission_id = ?",
         )
         .all(sub.id);
       return {
@@ -1119,7 +1131,7 @@ router.get("/metrics", async (req, res) => {
     // Total videos uploaded (submissions with photos)
     const videosUploaded = db
       .prepare(
-        `SELECT COUNT(*) as count FROM submissions s ${whereClause} AND s.image_path IS NOT NULL`
+        `SELECT COUNT(*) as count FROM submissions s ${whereClause} AND s.image_path IS NOT NULL`,
       )
       .get(...params);
 
@@ -1133,13 +1145,13 @@ router.get("/metrics", async (req, res) => {
     if (start_date) {
       videoDeliveredQuery = videoDeliveredQuery.replace(
         "AND DATE(s.created_at) >= ?",
-        "AND DATE(s.created_at) >= '" + start_date + "'"
+        "AND DATE(s.created_at) >= '" + start_date + "'",
       );
     }
     if (end_date) {
       videoDeliveredQuery = videoDeliveredQuery.replace(
         "AND DATE(s.created_at) <= ?",
-        "AND DATE(s.created_at) <= '" + end_date + "'"
+        "AND DATE(s.created_at) <= '" + end_date + "'",
       );
     }
     const videosDelivered = db
@@ -1160,7 +1172,7 @@ router.get("/metrics", async (req, res) => {
           COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
           COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
           COUNT(*) as total
-        FROM submissions s ${whereClause}`
+        FROM submissions s ${whereClause}`,
       )
       .get(...params);
 
@@ -1171,7 +1183,7 @@ router.get("/metrics", async (req, res) => {
           COUNT(CASE WHEN qc_status = 'pending' THEN 1 END) as pending,
           COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as approved,
           COUNT(CASE WHEN qc_status = 'rejected' THEN 1 END) as rejected
-        FROM submissions s ${whereClause}`
+        FROM submissions s ${whereClause}`,
       )
       .get(...params);
 
@@ -1181,7 +1193,7 @@ router.get("/metrics", async (req, res) => {
         `SELECT 
           COUNT(CASE WHEN consent_status = 'verified' THEN 1 END) as verified,
           COUNT(CASE WHEN consent_status = 'pending' OR consent_status IS NULL THEN 1 END) as pending
-        FROM submissions s ${whereClause}`
+        FROM submissions s ${whereClause}`,
       )
       .get(...params);
 
@@ -1278,7 +1290,9 @@ router.get("/per-language-stats", async (req, res) => {
     const db = getDb();
 
     // Audio generation stats by language
-    const audioByLanguage = db.prepare(`
+    const audioByLanguage = db
+      .prepare(
+        `
       SELECT 
         language_code,
         COUNT(*) as total,
@@ -1288,10 +1302,14 @@ router.get("/per-language-stats", async (req, res) => {
       FROM generated_audio
       GROUP BY language_code
       ORDER BY total DESC
-    `).all();
+    `,
+      )
+      .all();
 
     // Video generation stats by language
-    const videoByLanguage = db.prepare(`
+    const videoByLanguage = db
+      .prepare(
+        `
       SELECT 
         language_code,
         COUNT(*) as total,
@@ -1301,10 +1319,14 @@ router.get("/per-language-stats", async (req, res) => {
       FROM generated_videos
       GROUP BY language_code
       ORDER BY total DESC
-    `).all();
+    `,
+      )
+      .all();
 
     // Submissions with incomplete languages (audio not generated for all selected languages)
-    const incompleteAudio = db.prepare(`
+    const incompleteAudio = db
+      .prepare(
+        `
       SELECT 
         s.id,
         s.doctor_name,
@@ -1317,33 +1339,42 @@ router.get("/per-language-stats", async (req, res) => {
       WHERE s.status NOT IN ('draft', 'completed', 'failed')
       ORDER BY s.created_at DESC
       LIMIT 50
-    `).all();
+    `,
+      )
+      .all();
 
     // Parse selected_languages and filter incomplete
     const incompleteSubmissions = incompleteAudio
-      .map(s => {
-        const selectedLangs = JSON.parse(s.selected_languages || '[]');
+      .map((s) => {
+        const selectedLangs = JSON.parse(s.selected_languages || "[]");
         return {
           ...s,
           selected_languages: selectedLangs,
           total_languages: selectedLangs.length,
           audio_completed: s.audio_completed,
           audio_failed: s.audio_failed,
-          audio_remaining: selectedLangs.length - s.audio_completed - s.audio_failed
+          audio_remaining:
+            selectedLangs.length - s.audio_completed - s.audio_failed,
         };
       })
-      .filter(s => s.audio_remaining > 0 || s.audio_failed > 0);
+      .filter((s) => s.audio_remaining > 0 || s.audio_failed > 0);
 
     // Active voice clones (not yet deleted)
-    const activeVoices = db.prepare(`
+    const activeVoices = db
+      .prepare(
+        `
       SELECT COUNT(*) as count 
       FROM submissions 
       WHERE voice_clone_status = 'completed' 
         AND elevenlabs_voice_id IS NOT NULL
-    `).get();
+    `,
+      )
+      .get();
 
     // Per-language QC status
-    const qcByLanguage = db.prepare(`
+    const qcByLanguage = db
+      .prepare(
+        `
       SELECT 
         ga.language_code,
         COUNT(*) as total,
@@ -1354,12 +1385,24 @@ router.get("/per-language-stats", async (req, res) => {
       WHERE ga.status = 'completed'
       GROUP BY ga.language_code
       ORDER BY total DESC
-    `).all();
+    `,
+      )
+      .all();
 
     // Summary stats
-    const totalAudio = db.prepare("SELECT COUNT(*) as count FROM generated_audio WHERE status = 'completed'").get();
-    const totalVideo = db.prepare("SELECT COUNT(*) as count FROM generated_videos WHERE status = 'completed'").get();
-    const totalSubmissionsWithAllLangs = db.prepare(`
+    const totalAudio = db
+      .prepare(
+        "SELECT COUNT(*) as count FROM generated_audio WHERE status = 'completed'",
+      )
+      .get();
+    const totalVideo = db
+      .prepare(
+        "SELECT COUNT(*) as count FROM generated_videos WHERE status = 'completed'",
+      )
+      .get();
+    const totalSubmissionsWithAllLangs = db
+      .prepare(
+        `
       SELECT COUNT(*) as count FROM submissions s
       WHERE NOT EXISTS (
         SELECT 1 FROM (
@@ -1374,28 +1417,34 @@ router.get("/per-language-stats", async (req, res) => {
       )
       AND s.status NOT IN ('draft')
       AND json_array_length(s.selected_languages) > 0
-    `).get();
+    `,
+      )
+      .get();
 
     res.json({
       summary: {
         total_audio_generated: totalAudio.count,
         total_videos_uploaded: totalVideo.count,
         active_voice_clones: activeVoices.count,
-        submissions_with_all_languages_complete: totalSubmissionsWithAllLangs.count
+        submissions_with_all_languages_complete:
+          totalSubmissionsWithAllLangs.count,
       },
-      audio_by_language: audioByLanguage.map(a => ({
+      audio_by_language: audioByLanguage.map((a) => ({
         ...a,
-        language_name: SUPPORTED_LANGUAGES[a.language_code]?.name || a.language_code
+        language_name:
+          SUPPORTED_LANGUAGES[a.language_code]?.name || a.language_code,
       })),
-      video_by_language: videoByLanguage.map(v => ({
+      video_by_language: videoByLanguage.map((v) => ({
         ...v,
-        language_name: SUPPORTED_LANGUAGES[v.language_code]?.name || v.language_code
+        language_name:
+          SUPPORTED_LANGUAGES[v.language_code]?.name || v.language_code,
       })),
-      qc_by_language: qcByLanguage.map(q => ({
+      qc_by_language: qcByLanguage.map((q) => ({
         ...q,
-        language_name: SUPPORTED_LANGUAGES[q.language_code]?.name || q.language_code
+        language_name:
+          SUPPORTED_LANGUAGES[q.language_code]?.name || q.language_code,
       })),
-      incomplete_submissions: incompleteSubmissions.slice(0, 20)
+      incomplete_submissions: incompleteSubmissions.slice(0, 20),
     });
   } catch (error) {
     logger.error("[ADMIN] Error fetching per-language stats:", error);
@@ -1412,7 +1461,9 @@ router.get("/voice-management", async (req, res) => {
     const db = getDb();
 
     // Get all active voices with their age and usage
-    const activeVoices = db.prepare(`
+    const activeVoices = db
+      .prepare(
+        `
       SELECT 
         s.id as submission_id,
         s.doctor_name,
@@ -1430,19 +1481,28 @@ router.get("/voice-management", async (req, res) => {
       WHERE s.elevenlabs_voice_id IS NOT NULL
       GROUP BY s.id
       ORDER BY s.updated_at ASC
-    `).all();
+    `,
+      )
+      .all();
 
     // Calculate age in hours for each voice
     const now = Date.now();
-    const voicesWithAge = activeVoices.map(v => {
+    const voicesWithAge = activeVoices.map((v) => {
       const ageMs = now - new Date(v.updated_at).getTime();
       const ageHours = Math.round(ageMs / (1000 * 60 * 60));
       return {
         ...v,
         age_hours: ageHours,
-        languages_with_audio: v.languages_with_audio ? v.languages_with_audio.split(',') : [],
-        can_delete: v.submission_status === 'completed' || v.submission_status === 'failed',
-        recommended_for_cleanup: ageHours >= 24 && (v.submission_status === 'completed' || v.submission_status === 'failed')
+        languages_with_audio: v.languages_with_audio
+          ? v.languages_with_audio.split(",")
+          : [],
+        can_delete:
+          v.submission_status === "completed" ||
+          v.submission_status === "failed",
+        recommended_for_cleanup:
+          ageHours >= 24 &&
+          (v.submission_status === "completed" ||
+            v.submission_status === "failed"),
       };
     });
 
@@ -1455,19 +1515,24 @@ router.get("/voice-management", async (req, res) => {
     }
 
     // Count voices eligible for cleanup (24+ hours old, completed/failed status)
-    const eligibleForCleanup = voicesWithAge.filter(v => v.recommended_for_cleanup).length;
-    const totalActive = voicesWithAge.filter(v => v.voice_clone_status === 'completed').length;
+    const eligibleForCleanup = voicesWithAge.filter(
+      (v) => v.recommended_for_cleanup,
+    ).length;
+    const totalActive = voicesWithAge.filter(
+      (v) => v.voice_clone_status === "completed",
+    ).length;
 
     res.json({
       summary: {
         total_active_voices: totalActive,
         eligible_for_cleanup: eligibleForCleanup,
-        elevenlabs_quota: elevenLabsStatus?.subscription || null
+        elevenlabs_quota: elevenLabsStatus?.subscription || null,
       },
       voices: voicesWithAge,
-      cleanup_recommendation: eligibleForCleanup > 0 
-        ? `${eligibleForCleanup} voice(s) are 24+ hours old and ready for cleanup`
-        : 'No voices currently need cleanup'
+      cleanup_recommendation:
+        eligibleForCleanup > 0
+          ? `${eligibleForCleanup} voice(s) are 24+ hours old and ready for cleanup`
+          : "No voices currently need cleanup",
     });
   } catch (error) {
     logger.error("[ADMIN] Error fetching voice management data:", error);

@@ -73,15 +73,16 @@ async function validateImage(filePath) {
       );
     }
 
-    // Check resolution
+    // Check resolution (warning only, not blocking)
     if (
       metadata.width >= UPLOAD_CONFIG.IMAGE.minWidth &&
       metadata.height >= UPLOAD_CONFIG.IMAGE.minHeight
     ) {
       result.checks.resolution = true;
     } else {
-      result.errors.push(
-        `Image resolution (${metadata.width}x${metadata.height}) below minimum (${UPLOAD_CONFIG.IMAGE.minWidth}x${UPLOAD_CONFIG.IMAGE.minHeight})`
+      result.checks.resolution = true; // Mark as passed anyway
+      result.warnings.push(
+        `Image resolution (${metadata.width}x${metadata.height}) below recommended (${UPLOAD_CONFIG.IMAGE.minWidth}x${UPLOAD_CONFIG.IMAGE.minHeight})`
       );
     }
 

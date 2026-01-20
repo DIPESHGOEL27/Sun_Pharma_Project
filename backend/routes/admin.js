@@ -781,7 +781,7 @@ router.post("/sync-sheets", async (req, res) => {
         SELECT s.*, 
                d.full_name as doctor_name, d.email as doctor_email,
                d.phone as doctor_phone, d.specialty,
-               m.name as mr_name, m.mr_code, m.phone as mr_mobile
+               m.name as mr_name, m.mr_code, m.phone as mr_phone
         FROM submissions s
         LEFT JOIN doctors d ON s.doctor_id = d.id
         LEFT JOIN medical_reps m ON s.mr_id = m.id

@@ -186,12 +186,13 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
     qcStatusText = ""; // Pending QC
   }
 
-  // Format doctor voice samples (audio_gcs_path may be JSON array or comma-separated)
+  // Format doctor voice samples - check both audio_path and audio_gcs_path
   let voiceSamplesLinks = "";
-  if (submission.audio_gcs_path) {
+  const audioPathSource = submission.audio_gcs_path || submission.audio_path;
+  if (audioPathSource) {
     try {
       // Try parsing as JSON first
-      const audioArray = JSON.parse(submission.audio_gcs_path);
+      const audioArray = JSON.parse(audioPathSource);
       if (Array.isArray(audioArray)) {
         // Extract GCS paths or public URLs from array items
         voiceSamplesLinks = audioArray
@@ -207,7 +208,7 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
       }
     } catch (e) {
       // Not JSON, use as-is (might be comma-separated or single path)
-      voiceSamplesLinks = submission.audio_gcs_path;
+      voiceSamplesLinks = audioPathSource;
     }
   }
 
@@ -215,13 +216,16 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
   const videoUrl = video?.public_url || video?.gcs_path || "";
   const videoGeneratedOn = video?.updated_at || video?.created_at || "";
 
+  // Get MR mobile - check both mr_mobile and mr_phone (from joined query)
+  const mrMobile = submission.mr_mobile || submission.mr_phone || "";
+
   return [
     entryId,                                                    // A: ID
     languageName,                                               // B: Video Language
     submission.campaign_name || "sunpharma",                    // C: Campaign Name
     submission.mr_code || "",                                   // D: MR Code
     submission.mr_name || "",                                   // E: MR Name
-    submission.mr_mobile || "",                                 // F: MR Mobile no.
+    mrMobile,                                                   // F: MR Mobile no.
     submission.doctor_name || "",                               // G: Dr. Full Name
     submission.doctor_email || "",                              // H: Dr. Email
     submission.doctor_phone || "",                              // I: Dr. Mobile no.

@@ -186,6 +186,35 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
     qcStatusText = ""; // Pending QC
   }
 
+  // Format doctor voice samples (audio_gcs_path may be JSON array or comma-separated)
+  let voiceSamplesLinks = "";
+  if (submission.audio_gcs_path) {
+    try {
+      // Try parsing as JSON first
+      const audioArray = JSON.parse(submission.audio_gcs_path);
+      if (Array.isArray(audioArray)) {
+        // Extract GCS paths or public URLs from array items
+        voiceSamplesLinks = audioArray
+          .slice(0, 5) // Max 5 samples
+          .map(item => {
+            if (typeof item === 'string') return item;
+            return item.gcsPath || item.gcs_path || item.publicUrl || item.public_url || '';
+          })
+          .filter(url => url)
+          .join(", ");
+      } else if (typeof audioArray === 'object') {
+        voiceSamplesLinks = audioArray.gcsPath || audioArray.gcs_path || audioArray.publicUrl || '';
+      }
+    } catch (e) {
+      // Not JSON, use as-is (might be comma-separated or single path)
+      voiceSamplesLinks = submission.audio_gcs_path;
+    }
+  }
+
+  // Get video URL and timestamp
+  const videoUrl = video?.public_url || video?.gcs_path || "";
+  const videoGeneratedOn = video?.updated_at || video?.created_at || "";
+
   return [
     entryId,                                                    // A: ID
     languageName,                                               // B: Video Language
@@ -201,9 +230,9 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
     submission.doctor_city || "",                               // L: Doctor's City
     submission.doctor_state || "",                              // M: Doctor's State
     submission.image_public_url || submission.image_gcs_path || "", // N: Doctor Photo Link
-    audio?.public_url || audio?.gcs_path || submission.audio_gcs_path || "", // O: Doctor Voice Samples Links
-    video?.public_url || video?.gcs_path || "",                 // P: Final video link
-    video?.created_at || "",                                    // Q: Video Generated on
+    voiceSamplesLinks,                                          // O: Doctor Voice Samples Links
+    videoUrl,                                                   // P: Final video link
+    videoGeneratedOn,                                           // Q: Video Generated on
     qcStatusText,                                               // R: Status
     video?.qc_notes || audio?.qc_notes || "",                   // S: Reason for rejection / re-upload
     "",                                                         // T: Hindi Pronunciation

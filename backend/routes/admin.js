@@ -773,7 +773,7 @@ router.post("/sync-sheets", async (req, res) => {
   try {
     const db = getDb();
 
-    // Get all submissions
+    // Get all submissions with MR phone
     const getSubmissions = () => {
       return db
         .prepare(
@@ -781,7 +781,7 @@ router.post("/sync-sheets", async (req, res) => {
         SELECT s.*, 
                d.full_name as doctor_name, d.email as doctor_email,
                d.phone as doctor_phone, d.specialty,
-               m.name as mr_name, m.mr_code
+               m.name as mr_name, m.mr_code, m.phone as mr_mobile
         FROM submissions s
         LEFT JOIN doctors d ON s.doctor_id = d.id
         LEFT JOIN medical_reps m ON s.mr_id = m.id
@@ -802,9 +802,21 @@ router.post("/sync-sheets", async (req, res) => {
         .all(submissionId);
     };
 
+    // Get generated audio for a submission
+    const getAudios = (submissionId) => {
+      return db
+        .prepare(
+          `
+        SELECT * FROM generated_audio WHERE submission_id = ?
+      `
+        )
+        .all(submissionId);
+    };
+
     const success = await googleSheetsService.syncAllSubmissions(
       getSubmissions,
-      getVideos
+      getVideos,
+      getAudios
     );
 
     if (success) {

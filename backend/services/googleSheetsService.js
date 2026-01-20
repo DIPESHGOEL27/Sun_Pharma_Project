@@ -27,6 +27,51 @@ const LANGUAGE_NAMES = {
   pa: "Punjabi",
 };
 
+// GCS bucket name for URL conversion
+const GCS_BUCKET = "sunpharma-video-uploads-sage-shard-448708-v9";
+
+/**
+ * Convert various path formats to public HTTPS URLs
+ * Handles: gs:// URIs, local paths, and already-formed URLs
+ */
+function toPublicUrl(pathOrUri) {
+  if (!pathOrUri || typeof pathOrUri !== 'string') return '';
+  
+  const trimmed = pathOrUri.trim();
+  
+  // Already a public HTTPS URL
+  if (trimmed.startsWith('https://storage.googleapis.com/')) {
+    return trimmed;
+  }
+  
+  // GCS URI format: gs://bucket-name/path/to/file
+  if (trimmed.startsWith('gs://')) {
+    // Extract bucket and path from gs://bucket/path
+    const match = trimmed.match(/^gs:\/\/([^\/]+)\/(.+)$/);
+    if (match) {
+      const bucket = match[1];
+      const objectPath = match[2];
+      return `https://storage.googleapis.com/${bucket}/${objectPath}`;
+    }
+  }
+  
+  // Local file path format: /app/uploads/audio/...
+  // These are local container paths - cannot convert to public URL
+  // Return as-is (or could return empty if we want to hide local paths)
+  if (trimmed.startsWith('/app/uploads/')) {
+    // Return the local path as-is since these files aren't on GCS
+    return trimmed;
+  }
+  
+  // If it's a relative path that looks like a GCS object path
+  if (trimmed.startsWith('submissions/') || trimmed.startsWith('audio/')) {
+    return `https://storage.googleapis.com/${GCS_BUCKET}/${trimmed}`;
+  }
+  
+  // Return as-is for other formats
+  return trimmed;
+}
+
 // Initialize Google Sheets client
 let sheets = null;
 let auth = null;
@@ -194,30 +239,45 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
       // Try parsing as JSON first
       const audioArray = JSON.parse(audioPathSource);
       if (Array.isArray(audioArray)) {
-        // Extract GCS paths or public URLs from array items
+        // Extract GCS paths or public URLs from array items and convert to public URLs
         voiceSamplesLinks = audioArray
           .slice(0, 5) // Max 5 samples
           .map(item => {
-            if (typeof item === 'string') return item;
-            return item.gcsPath || item.gcs_path || item.publicUrl || item.public_url || '';
+            let rawPath = '';
+            if (typeof item === 'string') {
+              rawPath = item;
+            } else {
+              rawPath = item.publicUrl || item.public_url || item.gcsPath || item.gcs_path || '';
+            }
+            return toPublicUrl(rawPath);
           })
           .filter(url => url)
           .join(", ");
       } else if (typeof audioArray === 'object') {
-        voiceSamplesLinks = audioArray.gcsPath || audioArray.gcs_path || audioArray.publicUrl || '';
+        const rawPath = audioArray.publicUrl || audioArray.public_url || audioArray.gcsPath || audioArray.gcs_path || '';
+        voiceSamplesLinks = toPublicUrl(rawPath);
       }
     } catch (e) {
-      // Not JSON, use as-is (might be comma-separated or single path)
-      voiceSamplesLinks = audioPathSource;
+      // Not JSON - might be comma-separated paths or single path
+      // Split by comma and convert each to public URL
+      voiceSamplesLinks = audioPathSource
+        .split(',')
+        .map(p => toPublicUrl(p.trim()))
+        .filter(url => url)
+        .slice(0, 5)
+        .join(", ");
     }
   }
 
-  // Get video URL and timestamp
-  const videoUrl = video?.public_url || video?.gcs_path || "";
+  // Get video URL and timestamp - convert to public URL
+  const videoUrl = toPublicUrl(video?.public_url || video?.gcs_path || "");
   const videoGeneratedOn = video?.updated_at || video?.created_at || "";
 
   // Get MR mobile - check both mr_mobile and mr_phone (from joined query)
   const mrMobile = submission.mr_mobile || submission.mr_phone || "";
+
+  // Convert image path to public URL
+  const imageUrl = toPublicUrl(submission.image_public_url || submission.image_gcs_path || "");
 
   return [
     entryId,                                                    // A: ID
@@ -233,7 +293,7 @@ function formatSubmissionLanguageRow(submission, languageCode, options = {}) {
     submission.doctor_clinic_name || "",                        // K: Dr. Clinic/Hospital Name
     submission.doctor_city || "",                               // L: Doctor's City
     submission.doctor_state || "",                              // M: Doctor's State
-    submission.image_public_url || submission.image_gcs_path || "", // N: Doctor Photo Link
+    imageUrl,                                                   // N: Doctor Photo Link
     voiceSamplesLinks,                                          // O: Doctor Voice Samples Links
     videoUrl,                                                   // P: Final video link
     videoGeneratedOn,                                           // Q: Video Generated on

@@ -869,7 +869,7 @@ export default function DoctorSubmission() {
                       name="doctorName"
                       value={formData.doctorName}
                       onChange={handleChange}
-                      placeholder="Dr. John Doe"
+                      placeholder="Priya Sharma (DONOT use Dr. Priya Sharma)"
                       className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 ${
                         errors.doctorName ? "border-red-500" : "border-gray-300"
                       }`}
@@ -882,7 +882,7 @@ export default function DoctorSubmission() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Address <span className="text-red-500">*</span>
+                      Doctor's Email Address <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"

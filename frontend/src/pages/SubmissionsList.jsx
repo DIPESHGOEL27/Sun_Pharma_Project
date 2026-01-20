@@ -9,17 +9,28 @@ import {
   ChevronRightIcon,
   ArrowLeftIcon,
   ArrowRightOnRectangleIcon,
+  PlayIcon,
+  SpeakerWaveIcon,
 } from "@heroicons/react/24/outline";
+
+const LANGUAGE_NAMES = {
+  en: "English",
+  hi: "Hindi",
+  mr: "Marathi",
+  gu: "Gujarati",
+  ta: "Tamil",
+  te: "Telugu",
+  kn: "Kannada",
+  ml: "Malayalam",
+  bn: "Bengali",
+  pa: "Punjabi",
+};
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Status" },
-  { value: "draft", label: "Draft" },
   { value: "pending_consent", label: "Pending Consent" },
   { value: "consent_verified", label: "Consent Verified" },
   { value: "processing", label: "Processing" },
-  { value: "pending_qc", label: "Pending QC" },
-  { value: "qc_approved", label: "QC Approved" },
-  { value: "qc_rejected", label: "QC Rejected" },
   { value: "completed", label: "Completed" },
   { value: "failed", label: "Failed" },
 ];
@@ -27,15 +38,28 @@ const STATUS_OPTIONS = [
 const QC_STATUS_OPTIONS = [
   { value: "", label: "All QC Status" },
   { value: "pending", label: "Pending" },
-  { value: "in_review", label: "In Review" },
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Rejected" },
+];
+
+const LANGUAGE_OPTIONS = [
+  { value: "", label: "All Languages" },
+  { value: "en", label: "English" },
+  { value: "hi", label: "Hindi" },
+  { value: "mr", label: "Marathi" },
+  { value: "gu", label: "Gujarati" },
+  { value: "ta", label: "Tamil" },
+  { value: "te", label: "Telugu" },
+  { value: "kn", label: "Kannada" },
+  { value: "ml", label: "Malayalam" },
+  { value: "bn", label: "Bengali" },
+  { value: "pa", label: "Punjabi" },
 ];
 
 export default function SubmissionsList() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [submissions, setSubmissions] = useState([]);
+  const [entries, setEntries] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
     totalPages: 1,
@@ -44,6 +68,7 @@ export default function SubmissionsList() {
   const [filters, setFilters] = useState({
     status: "",
     qc_status: "",
+    language: "",
     search: "",
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -57,18 +82,20 @@ export default function SubmissionsList() {
 
   useEffect(() => {
     loadSubmissions();
-  }, [pagination.page, filters.status, filters.qc_status]);
+  }, [pagination.page, filters.status, filters.qc_status, filters.language]);
 
   const loadSubmissions = async () => {
     setLoading(true);
     try {
-      const response = await submissionsApi.list({
+      const response = await submissionsApi.listByLanguage({
         page: pagination.page,
-        limit: 20,
+        limit: 30,
         status: filters.status || undefined,
         qc_status: filters.qc_status || undefined,
+        language: filters.language || undefined,
+        search: filters.search || undefined,
       });
-      setSubmissions(response.data.submissions);
+      setEntries(response.data.entries);
       setPagination((prev) => ({
         ...prev,
         totalPages: response.data.pagination.totalPages,
@@ -86,16 +113,16 @@ export default function SubmissionsList() {
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
-  const filteredSubmissions = submissions.filter((sub) => {
-    if (!filters.search) return true;
-    const search = filters.search.toLowerCase();
-    return (
-      sub.doctor_name?.toLowerCase().includes(search) ||
-      sub.doctor_email?.toLowerCase().includes(search) ||
-      sub.mr_code?.toLowerCase().includes(search) ||
-      sub.id.toString().includes(search)
-    );
-  });
+  const handleSearch = () => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    loadSubmissions();
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -114,7 +141,7 @@ export default function SubmissionsList() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Submissions</h1>
             <p className="text-gray-500">
-              {pagination.total} total submissions
+              {pagination.total} total entries (submission × language)
             </p>
           </div>
         </div>
@@ -142,9 +169,10 @@ export default function SubmissionsList() {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, email, or ID..."
+              placeholder="Search by name, email, MR code, or ID..."
               value={filters.search}
-              onChange={(e) => handleFilterChange("search", e.target.value)}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onKeyPress={handleKeyPress}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-sunpharma-blue outline-none"
             />
           </div>
@@ -164,6 +192,17 @@ export default function SubmissionsList() {
               showFilters ? "" : "hidden lg:flex"
             }`}
           >
+            <select
+              value={filters.language}
+              onChange={(e) => handleFilterChange("language", e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-sunpharma-blue outline-none"
+            >
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange("status", e.target.value)}
@@ -196,7 +235,7 @@ export default function SubmissionsList() {
           <div className="flex items-center justify-center h-64">
             <div className="w-8 h-8 border-4 border-sunpharma-blue border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filteredSubmissions.length === 0 ? (
+        ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-500">
             <p className="text-lg font-medium">No submissions found</p>
             <p className="text-sm">Try adjusting your filters</p>
@@ -206,72 +245,100 @@ export default function SubmissionsList() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Language
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Doctor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     MR Code
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Languages
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     QC Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Media
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredSubmissions.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      #{sub.id}
+                {entries.map((entry) => (
+                  <tr key={entry.entry_id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      #{entry.submission_id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {LANGUAGE_NAMES[entry.language_code] || entry.language_code}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {sub.doctor_name || "N/A"}
+                          {entry.doctor_name || "N/A"}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {sub.doctor_email}
+                          {entry.doctor_email}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {sub.mr_code || "-"}
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {entry.mr_code || "-"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-wrap gap-1">
-                        {sub.selected_languages?.map((lang) => (
-                          <span key={lang} className="badge badge-info text-xs">
-                            {lang.toUpperCase()}
-                          </span>
-                        ))}
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <StatusBadge status={entry.language_status} />
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <QCStatusBadge status={entry.qc_status} />
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {entry.audio_url && (
+                          <a
+                            href={entry.audio_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-600 hover:text-indigo-800"
+                            title="Audio ready"
+                          >
+                            <SpeakerWaveIcon className="w-5 h-5" />
+                          </a>
+                        )}
+                        {entry.video_url && (
+                          <a
+                            href={entry.video_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green-600 hover:text-green-800"
+                            title="Video ready"
+                          >
+                            <PlayIcon className="w-5 h-5" />
+                          </a>
+                        )}
+                        {!entry.audio_url && !entry.video_url && (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={sub.status} />
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(entry.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <QCStatusBadge status={sub.qc_status} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(sub.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
                       <Link
-                        to={`/admin/submissions/${sub.id}`}
+                        to={`/admin/submissions/${entry.submission_id}?lang=${entry.language_code}`}
                         className="text-sunpharma-blue hover:text-blue-800 inline-flex items-center gap-1"
                       >
                         <EyeIcon className="w-4 h-4" />
@@ -289,7 +356,7 @@ export default function SubmissionsList() {
         {pagination.totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Page {pagination.page} of {pagination.totalPages}
+              Page {pagination.page} of {pagination.totalPages} ({pagination.total} entries)
             </div>
             <div className="flex gap-2">
               <button
@@ -320,30 +387,21 @@ export default function SubmissionsList() {
 
 function StatusBadge({ status }) {
   const config = {
-    draft: { label: "Draft", class: "bg-gray-100 text-gray-700" },
+    pending: { label: "Pending", class: "bg-gray-100 text-gray-700" },
     pending_consent: {
       label: "Pending Consent",
       class: "bg-yellow-100 text-yellow-800",
     },
     consent_verified: { label: "Verified", class: "bg-blue-100 text-blue-800" },
-    processing: { label: "Processing", class: "bg-purple-100 text-purple-800" },
-    voice_cloning: { label: "Cloning", class: "bg-purple-100 text-purple-800" },
-    audio_generation: {
-      label: "Audio Gen",
-      class: "bg-indigo-100 text-indigo-800",
-    },
-    video_generation: {
-      label: "Video Gen",
-      class: "bg-cyan-100 text-cyan-800",
-    },
-    pending_qc: { label: "Pending QC", class: "bg-amber-100 text-amber-800" },
-    qc_approved: { label: "Approved", class: "bg-green-100 text-green-800" },
-    qc_rejected: { label: "Rejected", class: "bg-red-100 text-red-800" },
-    completed: { label: "Completed", class: "bg-emerald-100 text-emerald-800" },
+    voice_ready: { label: "Voice Ready", class: "bg-purple-100 text-purple-800" },
+    processing: { label: "Processing", class: "bg-indigo-100 text-indigo-800" },
+    audio_ready: { label: "Audio Ready", class: "bg-cyan-100 text-cyan-800" },
+    video_ready: { label: "Video Ready", class: "bg-emerald-100 text-emerald-800" },
+    completed: { label: "Completed", class: "bg-green-100 text-green-800" },
     failed: { label: "Failed", class: "bg-red-100 text-red-800" },
   };
   const c = config[status] || {
-    label: status,
+    label: status || "Unknown",
     class: "bg-gray-100 text-gray-700",
   };
   return (
@@ -363,7 +421,7 @@ function QCStatusBadge({ status }) {
     rejected: { label: "Rejected", class: "bg-red-100 text-red-800" },
   };
   const c = config[status] || {
-    label: status || "N/A",
+    label: status || "Pending",
     class: "bg-gray-100 text-gray-700",
   };
   return (

@@ -36,6 +36,7 @@ api.interceptors.response.use(
 // Submissions API
 export const submissionsApi = {
   list: (params = {}) => api.get("/submissions", { params }),
+  listByLanguage: (params = {}) => api.get("/submissions/by-language", { params }),
   get: (id) => api.get(`/submissions/${id}`),
   create: (data) =>
     api.post("/submissions", data, {

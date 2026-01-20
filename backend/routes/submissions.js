@@ -287,6 +287,164 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * GET /api/submissions/by-language
+ * List submissions expanded by language - each submission+language = separate row
+ * This is the primary view for admin dashboard
+ */
+router.get("/by-language", async (req, res) => {
+  try {
+    const db = getDb();
+    const { page = 1, limit = 30, status, qc_status, language, search } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Get all submissions with their data
+    let baseQuery = `
+      SELECT s.*, d.full_name as doctor_name, d.email as doctor_email, 
+             d.phone as doctor_phone, d.specialty,
+             m.name as mr_name, m.mr_code
+      FROM submissions s
+      LEFT JOIN doctors d ON s.doctor_id = d.id
+      LEFT JOIN medical_reps m ON s.mr_id = m.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (status) {
+      baseQuery += " AND s.status = ?";
+      params.push(status);
+    }
+
+    if (search) {
+      baseQuery += " AND (d.full_name LIKE ? OR d.email LIKE ? OR m.mr_code LIKE ? OR s.id = ?)";
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern, search);
+    }
+
+    baseQuery += " ORDER BY s.created_at DESC";
+
+    const submissions = db.prepare(baseQuery).all(...params);
+
+    // Get all generated_audio and generated_videos for these submissions
+    const submissionIds = submissions.map(s => s.id);
+    
+    let audioData = [];
+    let videoData = [];
+    
+    if (submissionIds.length > 0) {
+      const placeholders = submissionIds.map(() => '?').join(',');
+      
+      audioData = db.prepare(`
+        SELECT submission_id, language_code, status, qc_status, qc_notes, 
+               created_at, updated_at, gcs_path, public_url
+        FROM generated_audio
+        WHERE submission_id IN (${placeholders})
+      `).all(...submissionIds);
+
+      videoData = db.prepare(`
+        SELECT submission_id, language_code, status, qc_status, qc_notes,
+               created_at, updated_at, gcs_path, public_url
+        FROM generated_videos
+        WHERE submission_id IN (${placeholders})
+      `).all(...submissionIds);
+    }
+
+    // Create lookup maps
+    const audioBySubmissionLang = {};
+    audioData.forEach(a => {
+      const key = `${a.submission_id}-${a.language_code}`;
+      audioBySubmissionLang[key] = a;
+    });
+
+    const videoBySubmissionLang = {};
+    videoData.forEach(v => {
+      const key = `${v.submission_id}-${v.language_code}`;
+      videoBySubmissionLang[key] = v;
+    });
+
+    // Expand submissions by language
+    let expandedRows = [];
+    submissions.forEach(sub => {
+      const langs = JSON.parse(sub.selected_languages || "[]");
+      langs.forEach(langCode => {
+        const key = `${sub.id}-${langCode}`;
+        const audio = audioBySubmissionLang[key];
+        const video = videoBySubmissionLang[key];
+
+        // Determine per-language status
+        let langStatus = 'pending';
+        let langQcStatus = 'pending';
+
+        if (video?.status === 'completed') {
+          langStatus = 'video_ready';
+          langQcStatus = video.qc_status || 'pending';
+        } else if (audio?.status === 'completed') {
+          langStatus = 'audio_ready';
+          langQcStatus = audio.qc_status || 'pending';
+        } else if (audio?.status === 'processing') {
+          langStatus = 'processing';
+        } else if (sub.voice_clone_status === 'completed') {
+          langStatus = 'voice_ready';
+        } else if (sub.status === 'consent_verified') {
+          langStatus = 'consent_verified';
+        } else if (sub.status === 'pending_consent') {
+          langStatus = 'pending_consent';
+        } else if (sub.status === 'failed') {
+          langStatus = 'failed';
+        }
+
+        expandedRows.push({
+          entry_id: key,
+          submission_id: sub.id,
+          language_code: langCode,
+          doctor_name: sub.doctor_name,
+          doctor_email: sub.doctor_email,
+          doctor_phone: sub.doctor_phone,
+          mr_name: sub.mr_name,
+          mr_code: sub.mr_code,
+          submission_status: sub.status,
+          language_status: langStatus,
+          qc_status: langQcStatus,
+          qc_notes: video?.qc_notes || audio?.qc_notes || '',
+          video_url: video?.public_url || '',
+          audio_url: audio?.public_url || '',
+          created_at: sub.created_at,
+          updated_at: video?.updated_at || audio?.updated_at || sub.updated_at
+        });
+      });
+    });
+
+    // Apply language filter
+    if (language) {
+      expandedRows = expandedRows.filter(r => r.language_code === language);
+    }
+
+    // Apply QC status filter
+    if (qc_status) {
+      expandedRows = expandedRows.filter(r => r.qc_status === qc_status);
+    }
+
+    // Get total count before pagination
+    const total = expandedRows.length;
+
+    // Apply pagination
+    const paginatedRows = expandedRows.slice(offset, offset + parseInt(limit));
+
+    res.json({
+      entries: paginatedRows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching submissions by language:", error);
+    res.status(500).json({ error: "Failed to fetch submissions by language" });
+  }
+});
+
+/**
  * GET /api/submissions/:id
  * Get single submission details
  */

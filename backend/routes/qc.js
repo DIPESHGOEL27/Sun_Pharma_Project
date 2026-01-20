@@ -899,6 +899,17 @@ router.post("/approve-language/:submissionId/:languageCode", async (req, res) =>
       `Language ${languageCode}: Audio=${results.audio || 'unchanged'}, Video=${results.video || 'unchanged'}. ${notes || ''}`
     );
 
+    // Sync to Google Sheet
+    try {
+      await googleSheetsService.updateQCStatusForLanguage(submissionId, languageCode, {
+        status: "Approved",
+        reason: notes || "",
+        comments: reviewer_name ? `Reviewed by: ${reviewer_name}` : "",
+      });
+    } catch (sheetError) {
+      logger.warn(`[QC] Failed to sync approval to sheet: ${sheetError.message}`);
+    }
+
     res.json({
       message: `QC updated for language ${languageCode}`,
       submission_id: submissionId,
@@ -1000,6 +1011,17 @@ router.post("/reject-language/:submissionId/:languageCode", async (req, res) => 
       'rejected',
       `Language ${languageCode} REJECTED: Audio=${results.audio || 'unchanged'}, Video=${results.video || 'unchanged'}. Reason: ${rejection_reason}`
     );
+
+    // Sync to Google Sheet
+    try {
+      await googleSheetsService.updateQCStatusForLanguage(submissionId, languageCode, {
+        status: "Rejected",
+        reason: rejection_reason,
+        comments: reviewer_name ? `Reviewed by: ${reviewer_name}` : "",
+      });
+    } catch (sheetError) {
+      logger.warn(`[QC] Failed to sync rejection to sheet: ${sheetError.message}`);
+    }
 
     res.json({
       message: `Language ${languageCode} rejected`,

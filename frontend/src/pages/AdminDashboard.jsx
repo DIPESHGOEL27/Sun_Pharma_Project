@@ -36,7 +36,7 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { adminApi } from "../services/api";
+import { adminApi, submissionsApi } from "../services/api";
 
 const COLORS = [
   "#1a365d",
@@ -58,6 +58,19 @@ const STATUS_COLORS = {
   failed: "#dc2626",
 };
 
+const LANGUAGE_NAMES = {
+  en: "English",
+  hi: "Hindi",
+  mr: "Marathi",
+  gu: "Gujarati",
+  ta: "Tamil",
+  te: "Telugu",
+  kn: "Kannada",
+  ml: "Malayalam",
+  bn: "Bengali",
+  pa: "Punjabi",
+};
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -76,7 +89,7 @@ export default function AdminDashboard() {
 
   // Data states
   const [overallData, setOverallData] = useState({
-    submissions: [],
+    entries: [],
     pagination: {},
   });
   const [mrGroupedData, setMrGroupedData] = useState({ mrData: [] });
@@ -147,8 +160,15 @@ export default function AdminDashboard() {
       if (endDate) params.end_date = endDate;
 
       if (activeTab === "overall") {
-        const response = await adminApi.getOverallData(params);
-        setOverallData(response.data);
+        // Use by-language endpoint for per-language entries
+        const response = await submissionsApi.listByLanguage({
+          ...params,
+          limit: 100,
+        });
+        setOverallData({
+          entries: response.data.entries || [],
+          pagination: response.data.pagination || {},
+        });
       } else if (activeTab === "mr-grouped") {
         if (mrSearch) params.search = mrSearch;
         const response = await adminApi.getMrGroupedData(params);
@@ -386,13 +406,26 @@ function TabButton({ active, onClick, icon: Icon, label }) {
 }
 
 function OverallDataTab({ data }) {
-  const { submissions = [], pagination = {} } = data;
+  const { entries = [], pagination = {} } = data;
+
+  // Helper to get pipeline step status
+  const getPipelineStep = (entry) => {
+    if (entry.submission_status === "pending_consent") return 0;
+    if (entry.submission_status === "consent_verified" && !entry.audio_url) return 1;
+    if (entry.audio_url && !entry.video_url) return 2;
+    if (entry.video_url && entry.qc_status === "pending") return 3;
+    if (entry.qc_status === "approved") return 4;
+    if (entry.qc_status === "rejected") return 3;
+    return 1;
+  };
+
+  const pipelineSteps = ["Consent", "Voice Clone", "Audio", "Video", "QC"];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">
-          All Submissions ({pagination.total || 0})
+          All Entries ({pagination.total || entries.length}) - Per Language
         </h3>
       </div>
 
@@ -400,92 +433,108 @@ function OverallDataTab({ data }) {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Doctor
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 MR
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Languages
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Language
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Pipeline
+              </th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 QC
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Consent
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {submissions.map((sub) => (
-              <tr key={sub.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                  #{sub.id}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="text-sm font-medium text-gray-900">
-                    {sub.doctor_name || "N/A"}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {sub.doctor_email}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="text-sm font-medium text-gray-900">
-                    {sub.mr_name || "N/A"}
-                  </div>
-                  <div className="text-xs text-gray-500">{sub.mr_code}</div>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {sub.selected_languages?.join(", ") || "-"}
-                </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={sub.status} />
-                </td>
-                <td className="px-4 py-3">
-                  <QCBadge status={sub.qc_status} />
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`badge ${
-                      sub.consent_verified ? "badge-success" : "badge-warning"
-                    }`}
-                  >
-                    {sub.consent_verified ? "Verified" : "Pending"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {new Date(sub.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3">
-                  <Link
-                    to={`/admin/submissions/${sub.id}`}
-                    className="text-sunpharma-blue hover:underline text-sm"
-                  >
-                    View
-                  </Link>
-                </td>
-              </tr>
-            ))}
+            {entries.map((entry) => {
+              const step = getPipelineStep(entry);
+              return (
+                <tr key={entry.entry_id} className="hover:bg-gray-50">
+                  <td className="px-3 py-3 text-sm font-medium text-gray-900">
+                    #{entry.submission_id}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="text-sm font-medium text-gray-900">
+                      {entry.doctor_name || "N/A"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {entry.doctor_email}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="text-sm font-medium text-gray-900">
+                      {entry.mr_name || "N/A"}
+                    </div>
+                    <div className="text-xs text-gray-500">{entry.mr_code}</div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                      {LANGUAGE_NAMES[entry.language_code] || entry.language_code?.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-1">
+                      {pipelineSteps.map((stepName, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-2 h-2 rounded-full ${
+                            idx < step
+                              ? "bg-green-500"
+                              : idx === step
+                              ? "bg-blue-500 animate-pulse"
+                              : "bg-gray-300"
+                          }`}
+                          title={stepName}
+                        />
+                      ))}
+                      <span className="ml-2 text-xs text-gray-500">
+                        {pipelineSteps[step] || "Done"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={entry.language_status || entry.submission_status} />
+                  </td>
+                  <td className="px-3 py-3">
+                    <QCBadge status={entry.qc_status} />
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-500">
+                    {new Date(entry.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-3 py-3">
+                    <Link
+                      to={`/admin/submissions/${entry.submission_id}`}
+                      className="text-sunpharma-blue hover:underline text-sm"
+                    >
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
-        {submissions.length === 0 && (
+        {entries.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            No submissions found for the selected date range
+            No entries found for the selected date range
           </div>
         )}
       </div>

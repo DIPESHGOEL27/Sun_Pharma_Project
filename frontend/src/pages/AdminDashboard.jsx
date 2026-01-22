@@ -86,6 +86,8 @@ export default function AdminDashboard() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // Data states
   const [overallData, setOverallData] = useState({
@@ -115,6 +117,17 @@ export default function AdminDashboard() {
       loadData();
     }
   }, [isLoggedIn, activeTab, startDate, endDate]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    if (!isLoggedIn || !autoRefresh) return;
+    
+    const interval = setInterval(() => {
+      loadData();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [isLoggedIn, autoRefresh, activeTab, startDate, endDate, mrSearch]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -181,6 +194,7 @@ export default function AdminDashboard() {
       console.error("Error loading data:", error);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   };
 
@@ -306,37 +320,65 @@ export default function AdminDashboard() {
 
       {/* Date Range Filter */}
       <div className="card">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">
-              Filter by Date:
-            </span>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">
+                Filter by Date:
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">From:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="input py-1.5"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">To:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="input py-1.5"
+                />
+              </div>
+              <button
+                onClick={clearFilters}
+                className="btn btn-outline py-1.5 text-sm"
+              >
+                Clear
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">From:</label>
+
+          {/* Auto-refresh controls */}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input py-1.5"
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="w-4 h-4 text-sunpharma-blue border-gray-300 rounded focus:ring-sunpharma-blue"
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">To:</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="input py-1.5"
-              />
-            </div>
+              <span className="text-sm text-gray-600">Auto-refresh (30s)</span>
+            </label>
+            {lastUpdated && (
+              <span className="text-xs text-gray-400">
+                Updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
             <button
-              onClick={clearFilters}
-              className="btn btn-outline py-1.5 text-sm"
+              onClick={loadData}
+              disabled={loading}
+              className="btn btn-outline py-1.5 text-sm flex items-center gap-1"
             >
-              Clear
+              <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
             </button>
           </div>
         </div>

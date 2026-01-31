@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   submissionsApi,
@@ -22,11 +22,28 @@ import {
   ArrowDownTrayIcon,
   GlobeAltIcon,
   TrashIcon,
+  LanguageIcon,
 } from "@heroicons/react/24/outline";
+
+const LANGUAGE_NAMES = {
+  en: "English",
+  hi: "Hindi",
+  mr: "Marathi",
+  gu: "Gujarati",
+  ta: "Tamil",
+  te: "Telugu",
+  kn: "Kannada",
+  ml: "Malayalam",
+  pa: "Punjabi",
+  or: "Odia",
+};
 
 export default function SubmissionDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedLang = searchParams.get("lang");
+  
   const [loading, setLoading] = useState(true);
   const [submission, setSubmission] = useState(null);
   const [actionLoading, setActionLoading] = useState("");
@@ -40,6 +57,15 @@ export default function SubmissionDetails() {
   const [perLanguageUploadProgress, setPerLanguageUploadProgress] = useState(
     {},
   );
+
+  // Get the current language data
+  const currentLanguageData = languageStatus?.languages?.find(
+    (l) => l.language_code === selectedLang
+  );
+
+  const handleLanguageChange = (langCode) => {
+    setSearchParams({ lang: langCode });
+  };
 
   useEffect(() => {
     loadSubmission();
@@ -352,24 +378,144 @@ export default function SubmissionDetails() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-          title="Go back"
-        >
-          <ArrowLeftIcon className="w-5 h-5" />
-        </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Submission #{submission.id}
-          </h1>
-          <p className="text-gray-500">
-            Created {new Date(submission.created_at).toLocaleString()}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-4 flex-1">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+            title="Go back"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </button>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">
+                Submission #{submission.id}
+              </h1>
+              {selectedLang && (
+                <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-sm font-medium">
+                  {LANGUAGE_NAMES[selectedLang] || selectedLang.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-500">
+              Created {new Date(submission.created_at).toLocaleString()}
+            </p>
+          </div>
         </div>
-        <StatusBadge status={submission.status} large />
+        <div className="flex items-center gap-3">
+          <StatusBadge status={selectedLang && currentLanguageData ? currentLanguageData.status : submission.status} large />
+        </div>
       </div>
+
+      {/* Language Selector */}
+      {submission.selected_languages?.length > 0 && (
+        <div className="card bg-blue-50 border border-blue-200">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <LanguageIcon className="w-5 h-5 text-blue-600" />
+              <span className="font-medium text-blue-900">Select Language:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {submission.selected_languages.map((lang) => {
+                const langData = languageStatus?.languages?.find(l => l.language_code === lang);
+                const isActive = selectedLang === lang;
+                return (
+                  <button
+                    key={lang}
+                    onClick={() => handleLanguageChange(lang)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      isActive
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-white text-blue-800 border border-blue-300 hover:bg-blue-100"
+                    }`}
+                  >
+                    {LANGUAGE_NAMES[lang] || lang.toUpperCase()}
+                    {langData && (
+                      <span className={`w-2 h-2 rounded-full ${
+                        langData.status === "completed" || langData.qc_status === "approved" 
+                          ? "bg-green-400" 
+                          : langData.status === "processing" 
+                            ? "bg-yellow-400 animate-pulse" 
+                            : langData.status === "failed" || langData.qc_status === "rejected"
+                              ? "bg-red-400"
+                              : "bg-gray-300"
+                      }`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {!selectedLang && (
+            <p className="mt-3 text-sm text-blue-700">
+              ⚠️ Please select a language to view and manage its specific pipeline status.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Language-Specific Status Card */}
+      {selectedLang && currentLanguageData && (
+        <div className="card border-2 border-blue-300">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <GlobeAltIcon className="w-5 h-5 text-blue-600" />
+            {LANGUAGE_NAMES[selectedLang]} Pipeline Status
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Status</div>
+              <div className="mt-1">
+                <StatusBadge status={currentLanguageData.status} />
+              </div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Audio</div>
+              <div className={`mt-1 font-medium ${currentLanguageData.audio_url ? "text-green-600" : "text-gray-400"}`}>
+                {currentLanguageData.audio_url ? "✓ Ready" : "Pending"}
+              </div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Video</div>
+              <div className={`mt-1 font-medium ${currentLanguageData.video_url ? "text-green-600" : "text-gray-400"}`}>
+                {currentLanguageData.video_url ? "✓ Ready" : "Pending"}
+              </div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">QC Status</div>
+              <div className="mt-1">
+                <QCStatusBadge status={currentLanguageData.qc_status} />
+              </div>
+            </div>
+          </div>
+          
+          {/* Quick media links for selected language */}
+          <div className="flex flex-wrap gap-3">
+            {currentLanguageData.audio_url && (
+              <a
+                href={currentLanguageData.audio_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline text-indigo-600 border-indigo-300 hover:bg-indigo-50 flex items-center gap-2"
+              >
+                <MusicalNoteIcon className="w-4 h-4" />
+                Download Audio
+              </a>
+            )}
+            {currentLanguageData.video_url && (
+              <a
+                href={currentLanguageData.video_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline text-green-600 border-green-300 hover:bg-green-50 flex items-center gap-2"
+              >
+                <VideoCameraIcon className="w-4 h-4" />
+                Download Video
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Final Video Download - Admin Only (Top Section) */}
       {adminRole === "admin" && submission.final_video_url && (
@@ -1246,16 +1392,22 @@ function LanguageStatusCard({
 
 function QcStatusBadge({ status, label }) {
   const config = {
-    pending: { bg: "bg-gray-100", text: "text-gray-600" },
-    approved: { bg: "bg-green-100", text: "text-green-700" },
-    rejected: { bg: "bg-red-100", text: "text-red-700" },
+    pending: { bg: "bg-gray-100", text: "text-gray-600", display: "Pending" },
+    approved: { bg: "bg-green-100", text: "text-green-700", display: "Approved" },
+    rejected: { bg: "bg-red-100", text: "text-red-700", display: "Rejected" },
+    in_review: { bg: "bg-blue-100", text: "text-blue-700", display: "In Review" },
   };
   const c = config[status] || config.pending;
   return (
     <span
       className={`px-2 py-0.5 text-xs font-medium rounded ${c.bg} ${c.text}`}
     >
-      {label}: {status}
+      {label ? `${label}: ${c.display}` : c.display}
     </span>
   );
+}
+
+// Alias for QC status badge without label
+function QCStatusBadge({ status }) {
+  return <QcStatusBadge status={status} />;
 }

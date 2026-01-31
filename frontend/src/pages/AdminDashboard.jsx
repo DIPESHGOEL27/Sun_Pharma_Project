@@ -509,7 +509,7 @@ function OverallDataTab({ data, onPageChange }) {
                   </span>
                 </div>
                 <Link
-                  to={`/admin/submissions/${entry.submission_id}`}
+                  to={`/admin/submissions/${entry.submission_id}?lang=${entry.language_code}`}
                   className="text-sunpharma-blue hover:underline text-sm font-medium"
                 >
                   View →
@@ -660,7 +660,7 @@ function OverallDataTab({ data, onPageChange }) {
                   </td>
                   <td className="px-3 py-3">
                     <Link
-                      to={`/admin/submissions/${entry.submission_id}`}
+                      to={`/admin/submissions/${entry.submission_id}?lang=${entry.language_code}`}
                       className="text-sunpharma-blue hover:underline text-sm"
                     >
                       View

@@ -353,7 +353,10 @@ router.get("/by-language", async (req, res) => {
           )
           .all(...submissionIds);
       } catch (e) {
-        logger.warn("Error fetching generated_audio, trying without public_url:", e.message);
+        logger.warn(
+          "Error fetching generated_audio, trying without public_url:",
+          e.message,
+        );
         audioData = db
           .prepare(
             `
@@ -378,7 +381,10 @@ router.get("/by-language", async (req, res) => {
           )
           .all(...submissionIds);
       } catch (e) {
-        logger.warn("Error fetching generated_videos with public_url, trying basic columns:", e.message);
+        logger.warn(
+          "Error fetching generated_videos with public_url, trying basic columns:",
+          e.message,
+        );
         try {
           videoData = db
             .prepare(
@@ -391,7 +397,10 @@ router.get("/by-language", async (req, res) => {
             )
             .all(...submissionIds);
         } catch (e2) {
-          logger.warn("Error fetching generated_videos, trying without qc columns:", e2.message);
+          logger.warn(
+            "Error fetching generated_videos, trying without qc columns:",
+            e2.message,
+          );
           videoData = db
             .prepare(
               `
@@ -426,7 +435,10 @@ router.get("/by-language", async (req, res) => {
         langs = JSON.parse(sub.selected_languages || "[]");
         if (!Array.isArray(langs)) langs = [];
       } catch (e) {
-        logger.warn(`Invalid selected_languages JSON for submission ${sub.id}:`, sub.selected_languages);
+        logger.warn(
+          `Invalid selected_languages JSON for submission ${sub.id}:`,
+          sub.selected_languages,
+        );
         langs = [];
       }
       langs.forEach((langCode) => {
@@ -469,7 +481,8 @@ router.get("/by-language", async (req, res) => {
           language_status: langStatus,
           qc_status: langQcStatus,
           qc_notes: video?.qc_notes || audio?.qc_notes || "",
-          video_url: video?.public_url || video?.video_url || video?.gcs_path || "",
+          video_url:
+            video?.public_url || video?.video_url || video?.gcs_path || "",
           audio_url: audio?.public_url || audio?.gcs_path || "",
           created_at: sub.created_at,
           updated_at: video?.updated_at || audio?.updated_at || sub.updated_at,

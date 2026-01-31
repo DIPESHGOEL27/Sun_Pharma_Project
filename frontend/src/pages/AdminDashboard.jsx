@@ -184,7 +184,11 @@ export default function AdminDashboard() {
         });
         setOverallData({
           entries: response.data.entries || [],
-          pagination: response.data.pagination || { page: 1, totalPages: 1, total: 0 },
+          pagination: response.data.pagination || {
+            page: 1,
+            totalPages: 1,
+            total: 0,
+          },
         });
       } else if (activeTab === "mr-grouped") {
         if (mrSearch) params.search = mrSearch;
@@ -430,8 +434,8 @@ export default function AdminDashboard() {
       ) : (
         <>
           {activeTab === "overall" && (
-            <OverallDataTab 
-              data={overallData} 
+            <OverallDataTab
+              data={overallData}
               onPageChange={handlePageChange}
             />
           )}
@@ -468,7 +472,8 @@ function TabButton({ active, onClick, icon: Icon, label, fullLabel }) {
 }
 
 function OverallDataTab({ data, onPageChange }) {
-  const { entries = [], pagination = { page: 1, totalPages: 1, total: 0 } } = data;
+  const { entries = [], pagination = { page: 1, totalPages: 1, total: 0 } } =
+    data;
 
   // Helper to get pipeline step status
   const getPipelineStep = (entry) => {
@@ -683,7 +688,8 @@ function OverallDataTab({ data, onPageChange }) {
       {pagination.totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-500">
-            Page {pagination.page} of {pagination.totalPages} ({pagination.total} entries)
+            Page {pagination.page} of {pagination.totalPages} (
+            {pagination.total} entries)
           </div>
           <div className="flex items-center gap-2">
             <button

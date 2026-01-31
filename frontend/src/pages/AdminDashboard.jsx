@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   DocumentTextIcon,
   UsersIcon,
@@ -22,6 +23,7 @@ import {
   ChevronUpIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 import {
   BarChart,
@@ -38,7 +40,7 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { adminApi, submissionsApi } from "../services/api";
+import { adminApi, submissionsApi, storageApi } from "../services/api";
 
 const COLORS = [
   "#1a365d",
@@ -554,6 +556,7 @@ function OverallDataTab({ data, onPageChange }) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <MediaDownloadCell entry={entry} />
                   <StatusBadge
                     status={entry.language_status || entry.submission_status}
                   />
@@ -595,6 +598,9 @@ function OverallDataTab({ data, onPageChange }) {
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 QC
+              </th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Media
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                 Created
@@ -659,6 +665,9 @@ function OverallDataTab({ data, onPageChange }) {
                   </td>
                   <td className="px-3 py-3">
                     <QCBadge status={entry.qc_status} />
+                  </td>
+                  <td className="px-3 py-3">
+                    <MediaDownloadCell entry={entry} />
                   </td>
                   <td className="px-3 py-3 text-sm text-gray-500 hidden lg:table-cell">
                     {new Date(entry.created_at).toLocaleDateString()}
@@ -1120,6 +1129,50 @@ function QCBadge({ status }) {
   };
 
   return <span className={`badge ${config.class}`}>{config.label}</span>;
+}
+
+function MediaDownloadCell({ entry }) {
+  const handleDownloadAudio = async () => {
+    if (!entry.audio_url) return;
+    
+    try {
+      toast.loading("Generating download link...", { id: "download-audio" });
+      const response = await storageApi.getSignedDownloadUrl(entry.audio_url);
+      toast.dismiss("download-audio");
+      window.open(response.data.downloadUrl, "_blank");
+    } catch (error) {
+      toast.dismiss("download-audio");
+      console.error("Error getting download URL:", error);
+      toast.error("Failed to download audio");
+    }
+  };
+
+  if (entry.audio_url) {
+    return (
+      <button
+        onClick={handleDownloadAudio}
+        className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 hover:underline"
+      >
+        <ArrowDownTrayIcon className="w-3 h-3" />
+        Audio
+      </button>
+    );
+  }
+  
+  if (entry.language_status === "processing" || entry.submission_status === "processing") {
+    return (
+      <span className="text-xs text-yellow-600 flex items-center gap-1">
+        <ArrowPathIcon className="w-3 h-3 animate-spin" />
+        Processing
+      </span>
+    );
+  }
+  
+  return (
+    <span className="text-xs text-gray-400">
+      Pending
+    </span>
+  );
 }
 
 function formatStatusLabel(status) {

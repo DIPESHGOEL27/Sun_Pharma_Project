@@ -1001,62 +1001,17 @@ export default function SubmissionDetails() {
             )}
           </div>
 
-          {/* Final Video & Editor Actions - Editor Only */}
+          {/* Editor Instructions */}
           {adminRole === "editor" && (
-            <div className="card space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <VideoCameraIcon className="w-5 h-5" />
-                  Upload Final Video
-                </h3>
-                {submission.final_video_url && (
-                  <button
-                    onClick={() => handleDownload(
-                      submission.final_video_gcs_path || submission.final_video_url,
-                      `final_video_${submission.id}.mp4`
-                    )}
-                    className="text-xs text-sunpharma-blue hover:underline"
-                  >
-                    View Current
-                  </button>
-                )}
-              </div>
-
-              {submission.final_video_url ? (
-                <p className="text-sm text-gray-600">
-                  Final video uploaded. You can replace it by uploading a new
-                  file below.
-                </p>
-              ) : (
-                <p className="text-sm text-gray-600">
-                  No final video uploaded yet. Upload the edited video here.
-                </p>
-              )}
-
-              <div className="space-y-2">
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) =>
-                    setFinalVideoFile(e.target.files?.[0] || null)
-                  }
-                  className="block w-full text-sm text-gray-600"
-                />
-                {finalUploadProgress > 0 && (
-                  <div className="text-xs text-gray-500">
-                    Uploading... {finalUploadProgress}%
-                  </div>
-                )}
-                <button
-                  onClick={handleFinalVideoUpload}
-                  disabled={!finalVideoFile || actionLoading === "final-upload"}
-                  className="btn-primary w-full justify-center disabled:opacity-50"
-                >
-                  {actionLoading === "final-upload"
-                    ? "Uploading..."
-                    : "Upload Final Video"}
-                </button>
-              </div>
+            <div className="card bg-purple-50 border border-purple-200">
+              <h3 className="font-semibold text-purple-900 flex items-center gap-2 mb-2">
+                <VideoCameraIcon className="w-5 h-5" />
+                Editor Instructions
+              </h3>
+              <p className="text-sm text-purple-800">
+                Upload videos for each language in the "Per-Language Status" section below. 
+                Each language card has its own upload option once audio is ready.
+              </p>
             </div>
           )}
 

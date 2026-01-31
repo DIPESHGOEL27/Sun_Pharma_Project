@@ -50,7 +50,7 @@ export default function ConsentVerification() {
     if (resendCooldown > 0) {
       const timer = setTimeout(
         () => setResendCooldown(resendCooldown - 1),
-        1000
+        1000,
       );
       return () => clearTimeout(timer);
     }
@@ -85,7 +85,7 @@ export default function ConsentVerification() {
       await consentApi.sendOtp(
         submissionId,
         submission?.doctor_email_full || null,
-        submission?.doctor_name || null
+        submission?.doctor_name || null,
       );
       toast.success("OTP sent to doctor's email!");
       setOtpSent(true);
@@ -107,7 +107,7 @@ export default function ConsentVerification() {
       await consentApi.resendOtp(
         submissionId,
         submission?.doctor_email_full || null,
-        submission?.doctor_name || null
+        submission?.doctor_name || null,
       );
       toast.success("OTP resent successfully!");
       setResendCooldown(60);
@@ -206,7 +206,6 @@ export default function ConsentVerification() {
   if (consentComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-
         {/* Header with Logo */}
         <header className="bg-white shadow-sm">
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -376,7 +375,6 @@ export default function ConsentVerification() {
   // Main consent form - single page flow
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-
       {/* Header with Logo */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">

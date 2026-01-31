@@ -693,7 +693,6 @@ export default function DoctorSubmission() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       {/* Logged in MR info bar */}
       <div className="bg-blue-600 text-white py-2 px-3 sm:px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">

@@ -353,12 +353,13 @@ export default function SubmissionDetails() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link
-          to="/admin/submissions"
+        <button
+          onClick={() => navigate(-1)}
           className="p-2 hover:bg-gray-100 rounded-lg"
+          title="Go back"
         >
           <ArrowLeftIcon className="w-5 h-5" />
-        </Link>
+        </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
             Submission #{submission.id}

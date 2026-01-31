@@ -20,6 +20,8 @@ import {
   ExclamationCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import {
   BarChart,
@@ -92,8 +94,9 @@ export default function AdminDashboard() {
   // Data states
   const [overallData, setOverallData] = useState({
     entries: [],
-    pagination: {},
+    pagination: { page: 1, totalPages: 1, total: 0 },
   });
+  const [currentPage, setCurrentPage] = useState(1);
   const [mrGroupedData, setMrGroupedData] = useState({ mrData: [] });
   const [metricsData, setMetricsData] = useState({});
   const [mrSearch, setMrSearch] = useState("");
@@ -116,7 +119,7 @@ export default function AdminDashboard() {
     if (isLoggedIn) {
       loadData();
     }
-  }, [isLoggedIn, activeTab, startDate, endDate]);
+  }, [isLoggedIn, activeTab, startDate, endDate, currentPage]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -176,11 +179,12 @@ export default function AdminDashboard() {
         // Use by-language endpoint for per-language entries
         const response = await submissionsApi.listByLanguage({
           ...params,
-          limit: 100,
+          page: currentPage,
+          limit: 30,
         });
         setOverallData({
           entries: response.data.entries || [],
-          pagination: response.data.pagination || {},
+          pagination: response.data.pagination || { page: 1, totalPages: 1, total: 0 },
         });
       } else if (activeTab === "mr-grouped") {
         if (mrSearch) params.search = mrSearch;
@@ -220,6 +224,11 @@ export default function AdminDashboard() {
     setStartDate("");
     setEndDate("");
     setMrSearch("");
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
   };
 
   // Login Screen
@@ -420,7 +429,12 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <>
-          {activeTab === "overall" && <OverallDataTab data={overallData} />}
+          {activeTab === "overall" && (
+            <OverallDataTab 
+              data={overallData} 
+              onPageChange={handlePageChange}
+            />
+          )}
           {activeTab === "mr-grouped" && (
             <MrGroupedTab
               data={mrGroupedData}
@@ -453,8 +467,8 @@ function TabButton({ active, onClick, icon: Icon, label, fullLabel }) {
   );
 }
 
-function OverallDataTab({ data }) {
-  const { entries = [], pagination = {} } = data;
+function OverallDataTab({ data, onPageChange }) {
+  const { entries = [], pagination = { page: 1, totalPages: 1, total: 0 } } = data;
 
   // Helper to get pipeline step status
   const getPipelineStep = (entry) => {
@@ -664,6 +678,34 @@ function OverallDataTab({ data }) {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
+          <div className="text-sm text-gray-500">
+            Page {pagination.page} of {pagination.totalPages} ({pagination.total} entries)
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className="btn btn-secondary p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+            </button>
+            <span className="px-3 py-1 text-sm font-medium bg-gray-100 rounded">
+              {pagination.page}
+            </span>
+            <button
+              onClick={() => onPageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.totalPages}
+              className="btn btn-secondary p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

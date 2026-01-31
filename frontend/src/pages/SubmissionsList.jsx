@@ -52,8 +52,8 @@ const LANGUAGE_OPTIONS = [
   { value: "te", label: "Telugu" },
   { value: "kn", label: "Kannada" },
   { value: "ml", label: "Malayalam" },
-  { value: "bn", label: "Bengali" },
   { value: "pa", label: "Punjabi" },
+  { value: "or", label: "Odia" },
 ];
 
 export default function SubmissionsList() {

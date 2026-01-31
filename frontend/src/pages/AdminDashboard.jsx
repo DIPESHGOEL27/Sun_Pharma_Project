@@ -67,7 +67,6 @@ const LANGUAGE_NAMES = {
   te: "Telugu",
   kn: "Kannada",
   ml: "Malayalam",
-  bn: "Bengali",
   pa: "Punjabi",
   or: "Odia",
 };
@@ -80,7 +79,7 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [userRole, setUserRole] = useState(
-    sessionStorage.getItem("adminRole") || "admin"
+    sessionStorage.getItem("adminRole") || "admin",
   );
 
   const [activeTab, setActiveTab] = useState("overall"); // overall, mr-grouped, metrics
@@ -122,11 +121,11 @@ export default function AdminDashboard() {
   // Auto-refresh every 30 seconds
   useEffect(() => {
     if (!isLoggedIn || !autoRefresh) return;
-    
+
     const interval = setInterval(() => {
       loadData();
     }, 30000); // 30 seconds
-    
+
     return () => clearInterval(interval);
   }, [isLoggedIn, autoRefresh, activeTab, startDate, endDate, mrSearch]);
 
@@ -151,7 +150,7 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       setLoginError(
-        error.response?.data?.error || "Invalid username or password"
+        error.response?.data?.error || "Invalid username or password",
       );
     } finally {
       setIsLoggingIn(false);
@@ -210,7 +209,7 @@ export default function AdminDashboard() {
       alert("Successfully synced to Google Sheets!");
     } catch (error) {
       alert(
-        "Failed to sync: " + (error.response?.data?.error || error.message)
+        "Failed to sync: " + (error.response?.data?.error || error.message),
       );
     } finally {
       setLoading(false);
@@ -292,9 +291,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500">
-            Manage and monitor video submissions
-          </p>
+          <p className="text-gray-500">Manage and monitor video submissions</p>
         </div>
         <div className="flex items-center gap-3">
           {userRole !== "viewer" && (
@@ -366,7 +363,9 @@ export default function AdminDashboard() {
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="w-4 h-4 text-sunpharma-blue border-gray-300 rounded focus:ring-sunpharma-blue"
               />
-              <span className="text-sm text-gray-600 whitespace-nowrap">Auto-refresh</span>
+              <span className="text-sm text-gray-600 whitespace-nowrap">
+                Auto-refresh
+              </span>
             </label>
             {lastUpdated && (
               <span className="text-xs text-gray-400 hidden sm:inline">
@@ -378,7 +377,9 @@ export default function AdminDashboard() {
               disabled={loading}
               className="btn btn-outline py-1.5 text-sm flex items-center gap-1"
             >
-              <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <ArrowPathIcon
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
               <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
@@ -458,7 +459,8 @@ function OverallDataTab({ data }) {
   // Helper to get pipeline step status
   const getPipelineStep = (entry) => {
     if (entry.submission_status === "pending_consent") return 0;
-    if (entry.submission_status === "consent_verified" && !entry.audio_url) return 1;
+    if (entry.submission_status === "consent_verified" && !entry.audio_url)
+      return 1;
     if (entry.audio_url && !entry.video_url) return 2;
     if (entry.video_url && entry.qc_status === "pending") return 3;
     if (entry.qc_status === "approved") return 4;
@@ -484,9 +486,12 @@ function OverallDataTab({ data }) {
             <div key={entry.entry_id} className="card p-4 space-y-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-sm font-medium text-gray-900">#{entry.submission_id}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    #{entry.submission_id}
+                  </span>
                   <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                    {LANGUAGE_NAMES[entry.language_code] || entry.language_code?.toUpperCase()}
+                    {LANGUAGE_NAMES[entry.language_code] ||
+                      entry.language_code?.toUpperCase()}
                   </span>
                 </div>
                 <Link
@@ -499,11 +504,15 @@ function OverallDataTab({ data }) {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <p className="text-xs text-gray-500">Doctor</p>
-                  <p className="font-medium truncate">{entry.doctor_name || "N/A"}</p>
+                  <p className="font-medium truncate">
+                    {entry.doctor_name || "N/A"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">MR</p>
-                  <p className="font-medium truncate">{entry.mr_name || "N/A"}</p>
+                  <p className="font-medium truncate">
+                    {entry.mr_name || "N/A"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -512,15 +521,23 @@ function OverallDataTab({ data }) {
                     <div
                       key={idx}
                       className={`w-2 h-2 rounded-full ${
-                        idx < step ? "bg-green-500" : idx === step ? "bg-blue-500 animate-pulse" : "bg-gray-300"
+                        idx < step
+                          ? "bg-green-500"
+                          : idx === step
+                            ? "bg-blue-500 animate-pulse"
+                            : "bg-gray-300"
                       }`}
                       title={stepName}
                     />
                   ))}
-                  <span className="ml-2 text-xs text-gray-500">{pipelineSteps[step] || "Done"}</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    {pipelineSteps[step] || "Done"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={entry.language_status || entry.submission_status} />
+                  <StatusBadge
+                    status={entry.language_status || entry.submission_status}
+                  />
                   <QCBadge status={entry.qc_status} />
                 </div>
               </div>
@@ -592,7 +609,8 @@ function OverallDataTab({ data }) {
                   </td>
                   <td className="px-3 py-3">
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                      {LANGUAGE_NAMES[entry.language_code] || entry.language_code?.toUpperCase()}
+                      {LANGUAGE_NAMES[entry.language_code] ||
+                        entry.language_code?.toUpperCase()}
                     </span>
                   </td>
                   <td className="px-3 py-3">
@@ -604,8 +622,8 @@ function OverallDataTab({ data }) {
                             idx < step
                               ? "bg-green-500"
                               : idx === step
-                              ? "bg-blue-500 animate-pulse"
-                              : "bg-gray-300"
+                                ? "bg-blue-500 animate-pulse"
+                                : "bg-gray-300"
                           }`}
                           title={stepName}
                         />
@@ -616,7 +634,9 @@ function OverallDataTab({ data }) {
                     </div>
                   </td>
                   <td className="px-3 py-3">
-                    <StatusBadge status={entry.language_status || entry.submission_status} />
+                    <StatusBadge
+                      status={entry.language_status || entry.submission_status}
+                    />
                   </td>
                   <td className="px-3 py-3">
                     <QCBadge status={entry.qc_status} />

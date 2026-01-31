@@ -95,19 +95,6 @@ const SUPPORTED_LANGUAGES = {
       use_speaker_boost: true,
     },
   },
-  bn: {
-    code: "bn",
-    name: "Bengali",
-    nativeName: "বাংলা",
-    elevenLabsModel: "eleven_multilingual_v2",
-    elevenLabsStsModel: "eleven_multilingual_sts_v2",
-    voiceSettings: {
-      stability: 0.5,
-      similarity_boost: 0.75,
-      style: 0.5,
-      use_speaker_boost: true,
-    },
-  },
   ml: {
     code: "ml",
     name: "Malayalam",

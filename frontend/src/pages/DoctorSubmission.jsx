@@ -23,7 +23,6 @@ const LANGUAGES = [
   { code: "ta", name: "Tamil", native: "தமிழ்" },
   { code: "te", name: "Telugu", native: "తెలుగు" },
   { code: "kn", name: "Kannada", native: "ಕನ್ನಡ" },
-  { code: "bn", name: "Bengali", native: "বাংলা" },
   { code: "ml", name: "Malayalam", native: "മലയാളം" },
   { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
   { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
@@ -104,7 +103,7 @@ function MRLoginScreen({ onLoginSuccess }) {
 
       if (status === 401) {
         setError(
-          "Invalid email or employee code. Please check your credentials and try again."
+          "Invalid email or employee code. Please check your credentials and try again.",
         );
       } else if (status === 400) {
         setError(message || "Please enter a valid email and employee code.");
@@ -455,7 +454,7 @@ export default function DoctorSubmission() {
             };
             audio.onerror = () => resolve(0);
           });
-        })
+        }),
       );
 
       setAudioDurations((prev) => [...prev, ...newDurations]);
@@ -502,7 +501,7 @@ export default function DoctorSubmission() {
       }
       setAudioValidating(false);
     },
-    [audioFiles.length]
+    [audioFiles.length],
   ); // Use length to avoid stale closure
 
   const {
@@ -574,7 +573,7 @@ export default function DoctorSubmission() {
       const urlsResponse = await storageApi.getSubmissionUploadUrls(
         formData.phone,
         imageFile,
-        audioFiles
+        audioFiles,
       );
 
       const {
@@ -591,7 +590,7 @@ export default function DoctorSubmission() {
         imageFile,
         (percent) => {
           // Optional: update progress state here
-        }
+        },
       );
       toast.dismiss("upload-image");
       toast.success("Photo uploaded successfully", { duration: 2000 });
@@ -613,19 +612,19 @@ export default function DoctorSubmission() {
           (index, percent, name) => {
             toast.loading(
               `Uploading audio files (${index + 1}/${audioFiles.length})...`,
-              { id: "upload-audio" }
+              { id: "upload-audio" },
             );
           },
           (overallPercent) => {
             // Overall progress
-          }
+          },
         );
 
         toast.dismiss("upload-audio");
 
         if (audioUploadResults.failed > 0) {
           toast.error(
-            `${audioUploadResults.failed} audio file(s) failed to upload`
+            `${audioUploadResults.failed} audio file(s) failed to upload`,
           );
         } else {
           toast.success("All audio files uploaded", { duration: 2000 });
@@ -883,7 +882,8 @@ export default function DoctorSubmission() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Doctor's Email Address <span className="text-red-500">*</span>
+                      Doctor's Email Address{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"
@@ -1040,8 +1040,8 @@ export default function DoctorSubmission() {
                       isImageDragActive
                         ? "border-blue-500 bg-blue-50"
                         : errors.image
-                        ? "border-red-400 hover:border-red-500"
-                        : "border-gray-300 hover:border-blue-400"
+                          ? "border-red-400 hover:border-red-500"
+                          : "border-gray-300 hover:border-blue-400"
                     }`}
                   >
                     <input {...getImageInputProps()} />
@@ -1198,13 +1198,13 @@ export default function DoctorSubmission() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setAudioFiles((prev) =>
-                                prev.filter((_, i) => i !== index)
+                                prev.filter((_, i) => i !== index),
                               );
                               setAudioDurations((prev) =>
-                                prev.filter((_, i) => i !== index)
+                                prev.filter((_, i) => i !== index),
                               );
                               setAudioValidations((prev) =>
-                                prev.filter((_, i) => i !== index)
+                                prev.filter((_, i) => i !== index),
                               );
                             }}
                             className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600 flex-shrink-0"
@@ -1224,8 +1224,8 @@ export default function DoctorSubmission() {
                         isAudioDragActive
                           ? "border-blue-500 bg-blue-50"
                           : errors.audio
-                          ? "border-red-400 hover:border-red-500"
-                          : "border-gray-300 hover:border-blue-400"
+                            ? "border-red-400 hover:border-red-500"
+                            : "border-gray-300 hover:border-blue-400"
                       }`}
                     >
                       <input

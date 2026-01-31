@@ -22,7 +22,6 @@ const LANGUAGE_NAMES = {
   te: "Telugu",
   kn: "Kannada",
   ml: "Malayalam",
-  bn: "Bengali",
   pa: "Punjabi",
   or: "Odia",
 };
@@ -248,12 +247,18 @@ export default function SubmissionsList() {
             {/* Mobile Card View */}
             <div className="block md:hidden p-4 space-y-3">
               {entries.map((entry) => (
-                <div key={entry.entry_id} className="border rounded-lg p-4 space-y-3 bg-white">
+                <div
+                  key={entry.entry_id}
+                  className="border rounded-lg p-4 space-y-3 bg-white"
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">#{entry.submission_id}</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        #{entry.submission_id}
+                      </span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {LANGUAGE_NAMES[entry.language_code] || entry.language_code}
+                        {LANGUAGE_NAMES[entry.language_code] ||
+                          entry.language_code}
                       </span>
                     </div>
                     <Link
@@ -266,7 +271,9 @@ export default function SubmissionsList() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-xs text-gray-500">Doctor</p>
-                      <p className="font-medium truncate">{entry.doctor_name || "N/A"}</p>
+                      <p className="font-medium truncate">
+                        {entry.doctor_name || "N/A"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">MR Code</p>
@@ -280,12 +287,22 @@ export default function SubmissionsList() {
                     </div>
                     <div className="flex items-center gap-2">
                       {entry.audio_url && (
-                        <a href={entry.audio_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600">
+                        <a
+                          href={entry.audio_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600"
+                        >
                           <SpeakerWaveIcon className="w-5 h-5" />
                         </a>
                       )}
                       {entry.video_url && (
-                        <a href={entry.video_url} target="_blank" rel="noopener noreferrer" className="text-green-600">
+                        <a
+                          href={entry.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600"
+                        >
                           <PlayIcon className="w-5 h-5" />
                         </a>
                       )}

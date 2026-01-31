@@ -530,7 +530,6 @@ async function initDatabase() {
     ["ta", "Tamil", "தமிழ்"],
     ["te", "Telugu", "తెలుగు"],
     ["kn", "Kannada", "ಕನ್ನಡ"],
-    ["bn", "Bengali", "বাংলা"],
     ["ml", "Malayalam", "മലയാളം"],
     ["pa", "Punjabi", "ਪੰਜਾਬੀ"],
     ["or", "Odia", "ଓଡ଼ିଆ"],

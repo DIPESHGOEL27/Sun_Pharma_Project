@@ -569,17 +569,29 @@ export default function SubmissionDetails() {
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <div className="text-sm text-gray-500">Audio</div>
               <div
-                className={`mt-1 font-medium ${currentLanguageData.audio_url ? "text-green-600" : "text-gray-400"}`}
+                className={`mt-1 font-medium ${currentLanguageData.audio_complete ? "text-green-600" : currentLanguageData.audio?.status === "processing" ? "text-yellow-600" : "text-gray-400"}`}
               >
-                {currentLanguageData.audio_url ? "✓ Ready" : "Pending"}
+                {currentLanguageData.audio_complete 
+                  ? "✓ Completed" 
+                  : currentLanguageData.audio?.status === "processing" 
+                    ? "⟳ Processing" 
+                    : currentLanguageData.audio?.status === "failed"
+                      ? "✗ Failed"
+                      : "Pending"}
               </div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <div className="text-sm text-gray-500">Video</div>
               <div
-                className={`mt-1 font-medium ${currentLanguageData.video_url ? "text-green-600" : "text-gray-400"}`}
+                className={`mt-1 font-medium ${currentLanguageData.video_complete ? "text-green-600" : currentLanguageData.video?.status === "processing" ? "text-yellow-600" : "text-gray-400"}`}
               >
-                {currentLanguageData.video_url ? "✓ Ready" : "Pending"}
+                {currentLanguageData.video_complete 
+                  ? "✓ Completed" 
+                  : currentLanguageData.video?.status === "processing" 
+                    ? "⟳ Processing" 
+                    : currentLanguageData.video?.status === "failed"
+                      ? "✗ Failed"
+                      : "Pending"}
               </div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
@@ -592,10 +604,10 @@ export default function SubmissionDetails() {
 
           {/* Quick media links for selected language */}
           <div className="flex flex-wrap gap-3">
-            {currentLanguageData.audio_url && (
+            {currentLanguageData.audio_complete && (currentLanguageData.audio?.gcs_path || currentLanguageData.audio?.public_url) && (
               <button
                 onClick={() => handleDownload(
-                  currentLanguageData.audio_gcs_path || currentLanguageData.audio_url,
+                  currentLanguageData.audio.gcs_path || currentLanguageData.audio.public_url,
                   `audio_${selectedLang}.wav`
                 )}
                 className="btn btn-outline text-indigo-600 border-indigo-300 hover:bg-indigo-50 flex items-center gap-2"
@@ -604,10 +616,10 @@ export default function SubmissionDetails() {
                 Download Audio
               </button>
             )}
-            {currentLanguageData.video_url && (
+            {currentLanguageData.video_complete && (currentLanguageData.video?.gcs_path || currentLanguageData.video?.public_url) && (
               <button
                 onClick={() => handleDownload(
-                  currentLanguageData.video_gcs_path || currentLanguageData.video_url,
+                  currentLanguageData.video.gcs_path || currentLanguageData.video.public_url,
                   `video_${selectedLang}.mp4`
                 )}
                 className="btn btn-outline text-green-600 border-green-300 hover:bg-green-50 flex items-center gap-2"
@@ -816,56 +828,6 @@ export default function SubmissionDetails() {
                     onReject={handleRejectLanguage}
                     onDownload={handleDownload}
                   />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Generated Audio */}
-          {submission.generated_audio?.length > 0 && (
-            <div className="card">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center justify-between">
-                <span>Generated Audio (Voice Cloned)</span>
-              </h3>
-              <div className="space-y-3">
-                {submission.generated_audio.map((audio) => (
-                  <div
-                    key={audio.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <MusicalNoteIcon className="w-5 h-5 text-sunpharma-blue" />
-                      <div>
-                        <div className="font-medium">
-                          {audio.language_code.toUpperCase()}
-                        </div>
-                        {audio.duration_seconds && (
-                          <div className="text-sm text-gray-500">
-                            {Math.floor(audio.duration_seconds / 60)}:
-                            {String(
-                              Math.floor(audio.duration_seconds % 60),
-                            ).padStart(2, "0")}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <AudioStatusBadge status={audio.status} />
-                      {(audio.gcs_path || audio.public_url || audio.file_path) &&
-                        audio.status === "completed" && (
-                          <button
-                            onClick={() => handleDownload(
-                              audio.gcs_path || audio.public_url,
-                              `audio_${audio.language_code}.wav`
-                            )}
-                            className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-1"
-                          >
-                            <ArrowDownTrayIcon className="w-4 h-4" />
-                            Download
-                          </button>
-                        )}
-                    </div>
-                  </div>
                 ))}
               </div>
             </div>

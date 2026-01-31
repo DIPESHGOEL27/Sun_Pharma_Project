@@ -1548,7 +1548,7 @@ router.get("/:id/languages", async (req, res) => {
     const generatedAudio = db
       .prepare(
         `
-      SELECT ga.*, am.title as audio_master_title, am.language_code as audio_master_language
+      SELECT ga.*, am.name as audio_master_name, am.language_code as audio_master_language
       FROM generated_audio ga
       LEFT JOIN audio_masters am ON ga.audio_master_id = am.id
       WHERE ga.submission_id = ?
@@ -1579,7 +1579,7 @@ router.get("/:id/languages", async (req, res) => {
               file_path: audio.file_path,
               gcs_path: audio.gcs_path,
               public_url: audio.public_url,
-              audio_master_title: audio.audio_master_title,
+              audio_master_name: audio.audio_master_name,
               created_at: audio.created_at,
               error_message: audio.error_message,
             }

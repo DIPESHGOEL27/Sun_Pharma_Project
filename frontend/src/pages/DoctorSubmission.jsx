@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { submissionsApi, adminApi, storageApi } from "../services/api";
 import {
   PhotoIcon,
@@ -693,7 +693,6 @@ export default function DoctorSubmission() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
 
       {/* Logged in MR info bar */}
       <div className="bg-blue-600 text-white py-2 px-3 sm:px-4">

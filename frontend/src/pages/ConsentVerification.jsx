@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { consentApi } from "../services/api";
 import {
   CheckCircleIcon,
@@ -40,6 +40,8 @@ export default function ConsentVerification() {
 
   // Load submission details
   useEffect(() => {
+    // Dismiss any lingering toasts from previous page
+    toast.dismiss();
     loadSubmission();
   }, [submissionId]);
 
@@ -204,7 +206,6 @@ export default function ConsentVerification() {
   if (consentComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
 
         {/* Header with Logo */}
         <header className="bg-white shadow-sm">
@@ -375,7 +376,6 @@ export default function ConsentVerification() {
   // Main consent form - single page flow
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
 
       {/* Header with Logo */}
       <header className="bg-white shadow-sm sticky top-0 z-10">

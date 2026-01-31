@@ -24,6 +24,7 @@ const LANGUAGE_NAMES = {
   ml: "Malayalam",
   bn: "Bengali",
   pa: "Punjabi",
+  or: "Odia",
 };
 
 const STATUS_OPTIONS = [
@@ -243,116 +244,169 @@ export default function SubmissionsList() {
             <p className="text-sm">Try adjusting your filters</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Language
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Doctor
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MR Code
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    QC Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Media
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {entries.map((entry) => (
-                  <tr key={entry.entry_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      #{entry.submission_id}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {LANGUAGE_NAMES[entry.language_code] ||
-                          entry.language_code}
+          <>
+            {/* Mobile Card View */}
+            <div className="block md:hidden p-4 space-y-3">
+              {entries.map((entry) => (
+                <div key={entry.entry_id} className="border rounded-lg p-4 space-y-3 bg-white">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">#{entry.submission_id}</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {LANGUAGE_NAMES[entry.language_code] || entry.language_code}
                       </span>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {entry.doctor_name || "N/A"}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {entry.doctor_email}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {entry.mr_code || "-"}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    </div>
+                    <Link
+                      to={`/admin/submissions/${entry.submission_id}?lang=${entry.language_code}`}
+                      className="text-sunpharma-blue hover:text-blue-800 text-sm font-medium"
+                    >
+                      View →
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500">Doctor</p>
+                      <p className="font-medium truncate">{entry.doctor_name || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">MR Code</p>
+                      <p className="font-medium">{entry.mr_code || "-"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <StatusBadge status={entry.language_status} />
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
                       <QCStatusBadge status={entry.qc_status} />
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {entry.audio_url && (
-                          <a
-                            href={entry.audio_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-indigo-600 hover:text-indigo-800"
-                            title="Audio ready"
-                          >
-                            <SpeakerWaveIcon className="w-5 h-5" />
-                          </a>
-                        )}
-                        {entry.video_url && (
-                          <a
-                            href={entry.video_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-green-600 hover:text-green-800"
-                            title="Video ready"
-                          >
-                            <PlayIcon className="w-5 h-5" />
-                          </a>
-                        )}
-                        {!entry.audio_url && !entry.video_url && (
-                          <span className="text-gray-400 text-xs">—</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(entry.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
-                      <Link
-                        to={`/admin/submissions/${entry.submission_id}?lang=${entry.language_code}`}
-                        className="text-sunpharma-blue hover:text-blue-800 inline-flex items-center gap-1"
-                      >
-                        <EyeIcon className="w-4 h-4" />
-                        View
-                      </Link>
-                    </td>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {entry.audio_url && (
+                        <a href={entry.audio_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600">
+                          <SpeakerWaveIcon className="w-5 h-5" />
+                        </a>
+                      )}
+                      {entry.video_url && (
+                        <a href={entry.video_url} target="_blank" rel="noopener noreferrer" className="text-green-600">
+                          <PlayIcon className="w-5 h-5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      ID
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Language
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Doctor
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                      MR Code
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      QC Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Media
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {entries.map((entry) => (
+                    <tr key={entry.entry_id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        #{entry.submission_id}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {LANGUAGE_NAMES[entry.language_code] ||
+                            entry.language_code}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {entry.doctor_name || "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate max-w-[150px]">
+                            {entry.doctor_email}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                        {entry.mr_code || "-"}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <StatusBadge status={entry.language_status} />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <QCStatusBadge status={entry.qc_status} />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {entry.audio_url && (
+                            <a
+                              href={entry.audio_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800"
+                              title="Audio ready"
+                            >
+                              <SpeakerWaveIcon className="w-5 h-5" />
+                            </a>
+                          )}
+                          {entry.video_url && (
+                            <a
+                              href={entry.video_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-600 hover:text-green-800"
+                              title="Video ready"
+                            >
+                              <PlayIcon className="w-5 h-5" />
+                            </a>
+                          )}
+                          {!entry.audio_url && !entry.video_url && (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                        {new Date(entry.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
+                        <Link
+                          to={`/admin/submissions/${entry.submission_id}?lang=${entry.language_code}`}
+                          className="text-sunpharma-blue hover:text-blue-800 inline-flex items-center gap-1"
+                        >
+                          <EyeIcon className="w-4 h-4" />
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Pagination */}

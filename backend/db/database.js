@@ -533,6 +533,7 @@ async function initDatabase() {
     ["bn", "Bengali", "বাংলা"],
     ["ml", "Malayalam", "മലയാളം"],
     ["pa", "Punjabi", "ਪੰਜਾਬੀ"],
+    ["or", "Odia", "ଓଡ଼ିଆ"],
   ];
 
   const insertMany = database.transaction((languages) => {

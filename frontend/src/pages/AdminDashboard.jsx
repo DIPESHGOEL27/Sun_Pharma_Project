@@ -69,6 +69,7 @@ const LANGUAGE_NAMES = {
   ml: "Malayalam",
   bn: "Bengali",
   pa: "Punjabi",
+  or: "Odia",
 };
 
 export default function AdminDashboard() {
@@ -357,7 +358,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Auto-refresh controls */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -365,11 +366,11 @@ export default function AdminDashboard() {
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="w-4 h-4 text-sunpharma-blue border-gray-300 rounded focus:ring-sunpharma-blue"
               />
-              <span className="text-sm text-gray-600">Auto-refresh (30s)</span>
+              <span className="text-sm text-gray-600 whitespace-nowrap">Auto-refresh</span>
             </label>
             {lastUpdated && (
-              <span className="text-xs text-gray-400">
-                Updated: {lastUpdated.toLocaleTimeString()}
+              <span className="text-xs text-gray-400 hidden sm:inline">
+                {lastUpdated.toLocaleTimeString()}
               </span>
             )}
             <button
@@ -378,32 +379,35 @@ export default function AdminDashboard() {
               className="btn btn-outline py-1.5 text-sm flex items-center gap-1"
             >
               <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="flex space-x-4 sm:space-x-8 min-w-max">
           <TabButton
             active={activeTab === "overall"}
             onClick={() => setActiveTab("overall")}
             icon={TableCellsIcon}
-            label="Overall Data"
+            label="Overall"
+            fullLabel="Overall Data"
           />
           <TabButton
             active={activeTab === "mr-grouped"}
             onClick={() => setActiveTab("mr-grouped")}
             icon={UserGroupIcon}
-            label="MR Grouped"
+            label="MR"
+            fullLabel="MR Grouped"
           />
           <TabButton
             active={activeTab === "metrics"}
             onClick={() => setActiveTab("metrics")}
             icon={PresentationChartLineIcon}
             label="Metrics"
+            fullLabel="Metrics"
           />
         </nav>
       </div>
@@ -431,18 +435,19 @@ export default function AdminDashboard() {
   );
 }
 
-function TabButton({ active, onClick, icon: Icon, label }) {
+function TabButton({ active, onClick, icon: Icon, label, fullLabel }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+      className={`flex items-center gap-1 sm:gap-2 py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
         active
           ? "border-sunpharma-blue text-sunpharma-blue"
           : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
       }`}
     >
-      <Icon className="w-5 h-5" />
-      {label}
+      <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+      <span className="sm:hidden">{label}</span>
+      <span className="hidden sm:inline">{fullLabel || label}</span>
     </button>
   );
 }
@@ -466,12 +471,71 @@ function OverallDataTab({ data }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">
-          All Entries ({pagination.total || entries.length}) - Per Language
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+          All Entries ({pagination.total || entries.length})
         </h3>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile Card View */}
+      <div className="block md:hidden space-y-3">
+        {entries.map((entry) => {
+          const step = getPipelineStep(entry);
+          return (
+            <div key={entry.entry_id} className="card p-4 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-sm font-medium text-gray-900">#{entry.submission_id}</span>
+                  <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                    {LANGUAGE_NAMES[entry.language_code] || entry.language_code?.toUpperCase()}
+                  </span>
+                </div>
+                <Link
+                  to={`/admin/submissions/${entry.submission_id}`}
+                  className="text-sunpharma-blue hover:underline text-sm font-medium"
+                >
+                  View →
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-xs text-gray-500">Doctor</p>
+                  <p className="font-medium truncate">{entry.doctor_name || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">MR</p>
+                  <p className="font-medium truncate">{entry.mr_name || "N/A"}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {pipelineSteps.map((stepName, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-2 h-2 rounded-full ${
+                        idx < step ? "bg-green-500" : idx === step ? "bg-blue-500 animate-pulse" : "bg-gray-300"
+                      }`}
+                      title={stepName}
+                    />
+                  ))}
+                  <span className="ml-2 text-xs text-gray-500">{pipelineSteps[step] || "Done"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={entry.language_status || entry.submission_status} />
+                  <QCBadge status={entry.qc_status} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {entries.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No entries found for the selected date range
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -481,7 +545,7 @@ function OverallDataTab({ data }) {
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Doctor
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                 MR
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -496,7 +560,7 @@ function OverallDataTab({ data }) {
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 QC
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                 Created
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -516,11 +580,11 @@ function OverallDataTab({ data }) {
                     <div className="text-sm font-medium text-gray-900">
                       {entry.doctor_name || "N/A"}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 truncate max-w-[150px]">
                       {entry.doctor_email}
                     </div>
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 hidden lg:table-cell">
                     <div className="text-sm font-medium text-gray-900">
                       {entry.mr_name || "N/A"}
                     </div>
@@ -546,7 +610,7 @@ function OverallDataTab({ data }) {
                           title={stepName}
                         />
                       ))}
-                      <span className="ml-2 text-xs text-gray-500">
+                      <span className="ml-2 text-xs text-gray-500 hidden xl:inline">
                         {pipelineSteps[step] || "Done"}
                       </span>
                     </div>
@@ -557,7 +621,7 @@ function OverallDataTab({ data }) {
                   <td className="px-3 py-3">
                     <QCBadge status={entry.qc_status} />
                   </td>
-                  <td className="px-3 py-3 text-sm text-gray-500">
+                  <td className="px-3 py-3 text-sm text-gray-500 hidden lg:table-cell">
                     {new Date(entry.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-3 py-3">

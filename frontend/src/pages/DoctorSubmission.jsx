@@ -26,6 +26,7 @@ const LANGUAGES = [
   { code: "bn", name: "Bengali", native: "বাংলা" },
   { code: "ml", name: "Malayalam", native: "മലയാളം" },
   { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
+  { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
 ];
 
 const MAX_LANGUAGES = 3;

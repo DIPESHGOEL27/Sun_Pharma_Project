@@ -78,12 +78,12 @@ export default function SubmissionDetails() {
       toast.error("No file path available");
       return;
     }
-    
+
     try {
       toast.loading("Generating download link...", { id: "download" });
       const response = await storageApi.getSignedDownloadUrl(gcsPath);
       toast.dismiss("download");
-      
+
       // Open the signed URL in a new tab
       window.open(response.data.downloadUrl, "_blank");
     } catch (error) {
@@ -102,7 +102,9 @@ export default function SubmissionDetails() {
       const fetchSignedUrl = async () => {
         if (audio.gcsPath) {
           try {
-            const response = await storageApi.getSignedDownloadUrl(audio.gcsPath);
+            const response = await storageApi.getSignedDownloadUrl(
+              audio.gcsPath,
+            );
             setAudioUrl(response.data.downloadUrl);
           } catch (error) {
             console.error("Error fetching signed URL for audio:", error);
@@ -571,10 +573,10 @@ export default function SubmissionDetails() {
               <div
                 className={`mt-1 font-medium ${currentLanguageData.audio_complete ? "text-green-600" : currentLanguageData.audio?.status === "processing" ? "text-yellow-600" : "text-gray-400"}`}
               >
-                {currentLanguageData.audio_complete 
-                  ? "✓ Completed" 
-                  : currentLanguageData.audio?.status === "processing" 
-                    ? "⟳ Processing" 
+                {currentLanguageData.audio_complete
+                  ? "✓ Completed"
+                  : currentLanguageData.audio?.status === "processing"
+                    ? "⟳ Processing"
                     : currentLanguageData.audio?.status === "failed"
                       ? "✗ Failed"
                       : "Pending"}
@@ -585,10 +587,10 @@ export default function SubmissionDetails() {
               <div
                 className={`mt-1 font-medium ${currentLanguageData.video_complete ? "text-green-600" : currentLanguageData.video?.status === "processing" ? "text-yellow-600" : "text-gray-400"}`}
               >
-                {currentLanguageData.video_complete 
-                  ? "✓ Completed" 
-                  : currentLanguageData.video?.status === "processing" 
-                    ? "⟳ Processing" 
+                {currentLanguageData.video_complete
+                  ? "✓ Completed"
+                  : currentLanguageData.video?.status === "processing"
+                    ? "⟳ Processing"
                     : currentLanguageData.video?.status === "failed"
                       ? "✗ Failed"
                       : "Pending"}
@@ -604,30 +606,40 @@ export default function SubmissionDetails() {
 
           {/* Quick media links for selected language */}
           <div className="flex flex-wrap gap-3">
-            {currentLanguageData.audio_complete && (currentLanguageData.audio?.gcs_path || currentLanguageData.audio?.public_url) && (
-              <button
-                onClick={() => handleDownload(
-                  currentLanguageData.audio.gcs_path || currentLanguageData.audio.public_url,
-                  `audio_${selectedLang}.wav`
-                )}
-                className="btn btn-outline text-indigo-600 border-indigo-300 hover:bg-indigo-50 flex items-center gap-2"
-              >
-                <MusicalNoteIcon className="w-4 h-4" />
-                Download Audio
-              </button>
-            )}
-            {currentLanguageData.video_complete && (currentLanguageData.video?.gcs_path || currentLanguageData.video?.public_url) && (
-              <button
-                onClick={() => handleDownload(
-                  currentLanguageData.video.gcs_path || currentLanguageData.video.public_url,
-                  `video_${selectedLang}.mp4`
-                )}
-                className="btn btn-outline text-green-600 border-green-300 hover:bg-green-50 flex items-center gap-2"
-              >
-                <VideoCameraIcon className="w-4 h-4" />
-                Download Video
-              </button>
-            )}
+            {currentLanguageData.audio_complete &&
+              (currentLanguageData.audio?.gcs_path ||
+                currentLanguageData.audio?.public_url) && (
+                <button
+                  onClick={() =>
+                    handleDownload(
+                      currentLanguageData.audio.gcs_path ||
+                        currentLanguageData.audio.public_url,
+                      `audio_${selectedLang}.wav`,
+                    )
+                  }
+                  className="btn btn-outline text-indigo-600 border-indigo-300 hover:bg-indigo-50 flex items-center gap-2"
+                >
+                  <MusicalNoteIcon className="w-4 h-4" />
+                  Download Audio
+                </button>
+              )}
+            {currentLanguageData.video_complete &&
+              (currentLanguageData.video?.gcs_path ||
+                currentLanguageData.video?.public_url) && (
+                <button
+                  onClick={() =>
+                    handleDownload(
+                      currentLanguageData.video.gcs_path ||
+                        currentLanguageData.video.public_url,
+                      `video_${selectedLang}.mp4`,
+                    )
+                  }
+                  className="btn btn-outline text-green-600 border-green-300 hover:bg-green-50 flex items-center gap-2"
+                >
+                  <VideoCameraIcon className="w-4 h-4" />
+                  Download Video
+                </button>
+              )}
           </div>
         </div>
       )}
@@ -648,10 +660,12 @@ export default function SubmissionDetails() {
               </div>
             </div>
             <button
-              onClick={() => handleDownload(
-                submission.final_video_gcs_path || submission.final_video_url,
-                `final_video_${submission.id}.mp4`
-              )}
+              onClick={() =>
+                handleDownload(
+                  submission.final_video_gcs_path || submission.final_video_url,
+                  `final_video_${submission.id}.mp4`,
+                )
+              }
               className="btn-primary bg-green-600 hover:bg-green-700"
             >
               Download Final Video
@@ -926,10 +940,12 @@ export default function SubmissionDetails() {
                 submission.image_url ||
                 submission.image_path) && (
                 <button
-                  onClick={() => handleDownload(
-                    submission.image_gcs_path || submission.image_url,
-                    `doctor_photo_${submission.id}.jpg`
-                  )}
+                  onClick={() =>
+                    handleDownload(
+                      submission.image_gcs_path || submission.image_url,
+                      `doctor_photo_${submission.id}.jpg`,
+                    )
+                  }
                   className="text-xs text-sunpharma-blue hover:underline"
                 >
                   Download
@@ -972,12 +988,16 @@ export default function SubmissionDetails() {
                 Voice Sample
               </span>
               {submission.audio_files?.length > 0 &&
-                (submission.audio_files[0].gcsPath || submission.audio_files[0].publicUrl) && (
+                (submission.audio_files[0].gcsPath ||
+                  submission.audio_files[0].publicUrl) && (
                   <button
-                    onClick={() => handleDownload(
-                      submission.audio_files[0].gcsPath || submission.audio_files[0].publicUrl,
-                      `voice_sample_${submission.id}.wav`
-                    )}
+                    onClick={() =>
+                      handleDownload(
+                        submission.audio_files[0].gcsPath ||
+                          submission.audio_files[0].publicUrl,
+                        `voice_sample_${submission.id}.wav`,
+                      )
+                    }
                     className="text-xs text-sunpharma-blue hover:underline"
                   >
                     Download
@@ -1009,8 +1029,9 @@ export default function SubmissionDetails() {
                 Editor Instructions
               </h3>
               <p className="text-sm text-purple-800">
-                Upload videos for each language in the "Per-Language Status" section below. 
-                Each language card has its own upload option once audio is ready.
+                Upload videos for each language in the "Per-Language Status"
+                section below. Each language card has its own upload option once
+                audio is ready.
               </p>
             </div>
           )}
@@ -1190,15 +1211,33 @@ function ValidationCard({ title, isValid, checks }) {
 // Processing status badge (for audio/video generation status)
 function ProcessingStatusBadge({ status }) {
   const config = {
-    pending: { label: "Pending", class: "bg-gray-100 text-gray-700", icon: ClockIcon },
-    processing: { label: "Processing", class: "bg-yellow-100 text-yellow-800 animate-pulse", icon: ArrowPathIcon },
-    completed: { label: "Completed", class: "bg-green-100 text-green-800", icon: CheckCircleIcon },
-    failed: { label: "Failed", class: "bg-red-100 text-red-800", icon: XCircleIcon },
+    pending: {
+      label: "Pending",
+      class: "bg-gray-100 text-gray-700",
+      icon: ClockIcon,
+    },
+    processing: {
+      label: "Processing",
+      class: "bg-yellow-100 text-yellow-800 animate-pulse",
+      icon: ArrowPathIcon,
+    },
+    completed: {
+      label: "Completed",
+      class: "bg-green-100 text-green-800",
+      icon: CheckCircleIcon,
+    },
+    failed: {
+      label: "Failed",
+      class: "bg-red-100 text-red-800",
+      icon: XCircleIcon,
+    },
   };
   const c = config[status] || config.pending;
   const Icon = c.icon;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${c.class}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${c.class}`}
+    >
       <Icon className="w-3 h-3" />
       {c.label}
     </span>
@@ -1228,13 +1267,26 @@ function LanguageStatusCard({
 
   // Get overall status for the language
   const getOverallStatus = () => {
-    if (!lang.audio) return { label: "Pending", class: "bg-gray-100 text-gray-600" };
-    if (lang.audio?.status === "processing") return { label: "Processing Audio", class: "bg-yellow-100 text-yellow-700" };
-    if (lang.audio?.status === "failed") return { label: "Audio Failed", class: "bg-red-100 text-red-700" };
-    if (audioComplete && !lang.video) return { label: "Audio Ready", class: "bg-blue-100 text-blue-700" };
-    if (lang.video?.status === "processing") return { label: "Processing Video", class: "bg-yellow-100 text-yellow-700" };
-    if (lang.video?.status === "failed") return { label: "Video Failed", class: "bg-red-100 text-red-700" };
-    if (readyForQC) return { label: "Ready for QC", class: "bg-green-100 text-green-700" };
+    if (!lang.audio)
+      return { label: "Pending", class: "bg-gray-100 text-gray-600" };
+    if (lang.audio?.status === "processing")
+      return {
+        label: "Processing Audio",
+        class: "bg-yellow-100 text-yellow-700",
+      };
+    if (lang.audio?.status === "failed")
+      return { label: "Audio Failed", class: "bg-red-100 text-red-700" };
+    if (audioComplete && !lang.video)
+      return { label: "Audio Ready", class: "bg-blue-100 text-blue-700" };
+    if (lang.video?.status === "processing")
+      return {
+        label: "Processing Video",
+        class: "bg-yellow-100 text-yellow-700",
+      };
+    if (lang.video?.status === "failed")
+      return { label: "Video Failed", class: "bg-red-100 text-red-700" };
+    if (readyForQC)
+      return { label: "Ready for QC", class: "bg-green-100 text-green-700" };
     return { label: "In Progress", class: "bg-blue-100 text-blue-600" };
   };
 
@@ -1247,7 +1299,9 @@ function LanguageStatusCard({
           <span className="font-semibold text-lg">
             {langCode.toUpperCase()}
           </span>
-          <span className={`px-2 py-0.5 text-xs rounded-full ${overallStatus.class}`}>
+          <span
+            className={`px-2 py-0.5 text-xs rounded-full ${overallStatus.class}`}
+          >
             {overallStatus.label}
           </span>
         </div>
@@ -1268,17 +1322,20 @@ function LanguageStatusCard({
                   Master: {lang.audio.audio_master_name}
                 </div>
               )}
-              {(lang.audio.gcs_path || lang.audio.public_url) && lang.audio.status === "completed" && (
-                <button
-                  onClick={() => onDownload(
-                    lang.audio.gcs_path || lang.audio.public_url,
-                    `audio_${lang.language_code}.wav`
-                  )}
-                  className="text-xs text-blue-600 hover:underline block"
-                >
-                  Download Audio
-                </button>
-              )}
+              {(lang.audio.gcs_path || lang.audio.public_url) &&
+                lang.audio.status === "completed" && (
+                  <button
+                    onClick={() =>
+                      onDownload(
+                        lang.audio.gcs_path || lang.audio.public_url,
+                        `audio_${lang.language_code}.wav`,
+                      )
+                    }
+                    className="text-xs text-blue-600 hover:underline block"
+                  >
+                    Download Audio
+                  </button>
+                )}
               {lang.audio.error_message && (
                 <div className="text-xs text-red-500">
                   Error: {lang.audio.error_message}
@@ -1299,17 +1356,20 @@ function LanguageStatusCard({
           {lang.video ? (
             <div className="space-y-2">
               <ProcessingStatusBadge status={lang.video.status} />
-              {(lang.video.gcs_path || lang.video.public_url) && lang.video.status === "completed" && (
-                <button
-                  onClick={() => onDownload(
-                    lang.video.gcs_path || lang.video.public_url,
-                    `video_${lang.language_code}.mp4`
-                  )}
-                  className="text-xs text-purple-600 hover:underline block"
-                >
-                  Download Video
-                </button>
-              )}
+              {(lang.video.gcs_path || lang.video.public_url) &&
+                lang.video.status === "completed" && (
+                  <button
+                    onClick={() =>
+                      onDownload(
+                        lang.video.gcs_path || lang.video.public_url,
+                        `video_${lang.language_code}.mp4`,
+                      )
+                    }
+                    className="text-xs text-purple-600 hover:underline block"
+                  >
+                    Download Video
+                  </button>
+                )}
               {lang.video.error_message && (
                 <div className="text-xs text-red-500">
                   Error: {lang.video.error_message}

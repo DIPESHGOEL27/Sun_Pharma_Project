@@ -1134,7 +1134,7 @@ function QCBadge({ status }) {
 function MediaDownloadCell({ entry }) {
   const handleDownloadAudio = async () => {
     if (!entry.audio_url) return;
-    
+
     try {
       toast.loading("Generating download link...", { id: "download-audio" });
       const response = await storageApi.getSignedDownloadUrl(entry.audio_url);
@@ -1158,8 +1158,11 @@ function MediaDownloadCell({ entry }) {
       </button>
     );
   }
-  
-  if (entry.language_status === "processing" || entry.submission_status === "processing") {
+
+  if (
+    entry.language_status === "processing" ||
+    entry.submission_status === "processing"
+  ) {
     return (
       <span className="text-xs text-yellow-600 flex items-center gap-1">
         <ArrowPathIcon className="w-3 h-3 animate-spin" />
@@ -1167,12 +1170,8 @@ function MediaDownloadCell({ entry }) {
       </span>
     );
   }
-  
-  return (
-    <span className="text-xs text-gray-400">
-      Pending
-    </span>
-  );
+
+  return <span className="text-xs text-gray-400">Pending</span>;
 }
 
 function formatStatusLabel(status) {

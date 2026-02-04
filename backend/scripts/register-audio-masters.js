@@ -72,16 +72,12 @@ async function main() {
       );
       console.log(`  ✓ Uploaded to: ${uploadResult.gcsPath}`);
 
-      // Get file stats
-      const stats = fs.statSync(filePath);
-      const fileSizeKb = Math.round(stats.size / 1024);
-
       // Insert into database
       const stmt = db.prepare(`
         INSERT INTO audio_masters (
           language_code, name, description, file_path, gcs_path, 
-          file_size_kb, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `);
 
       const result = stmt.run(
@@ -90,7 +86,6 @@ async function main() {
         `Master voice over audio for ${lang.name} language video generation`,
         filePath,
         uploadResult.gcsPath,
-        fileSizeKb,
       );
 
       console.log(`  ✓ Registered in DB with ID: ${result.lastInsertRowid}`);

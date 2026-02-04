@@ -232,23 +232,48 @@ router.post("/signed-download-url", async (req, res) => {
     let result;
 
     if (gcsPath) {
-      // Parse gcsPath to get bucket and file
-      const withoutPrefix = gcsPath.replace("gs://", "");
-      const firstSlash = withoutPrefix.indexOf("/");
-      const bucket = withoutPrefix.slice(0, firstSlash);
-      const file = withoutPrefix.slice(firstSlash + 1);
+      let bucket, file;
+
+      // Handle different URL formats
+      if (gcsPath.startsWith("gs://")) {
+        // Format: gs://bucket-name/path/to/file
+        const withoutPrefix = gcsPath.replace("gs://", "");
+        const firstSlash = withoutPrefix.indexOf("/");
+        bucket = withoutPrefix.slice(0, firstSlash);
+        file = withoutPrefix.slice(firstSlash + 1);
+      } else if (gcsPath.includes("storage.googleapis.com")) {
+        // Format: https://storage.googleapis.com/bucket-name/path/to/file
+        const url = new URL(gcsPath);
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        bucket = pathParts[0];
+        file = pathParts.slice(1).join("/");
+      } else if (gcsPath.includes("storage.cloud.google.com")) {
+        // Format: https://storage.cloud.google.com/bucket-name/path/to/file
+        const url = new URL(gcsPath);
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        bucket = pathParts[0];
+        file = pathParts.slice(1).join("/");
+      } else {
+        // Assume it's a relative path - use UPLOADS bucket
+        bucket = gcsService.BUCKETS.UPLOADS;
+        file = gcsPath;
+      }
 
       // Find bucket type from bucket name
       const bucketTypes = Object.entries(gcsService.BUCKETS);
       const foundType = bucketTypes.find(([, name]) => name === bucket);
 
       if (!foundType) {
-        return res.status(400).json({ error: "Unknown bucket" });
+        logger.warn(`[STORAGE] Unknown bucket: ${bucket}, falling back to UPLOADS`);
+        // Try with UPLOADS bucket as fallback
+        result = await gcsService.getSignedDownloadUrl("UPLOADS", file, {
+          expiresInMinutes,
+        });
+      } else {
+        result = await gcsService.getSignedDownloadUrl(foundType[0], file, {
+          expiresInMinutes,
+        });
       }
-
-      result = await gcsService.getSignedDownloadUrl(foundType[0], file, {
-        expiresInMinutes,
-      });
     } else if (bucketType && filePath) {
       result = await gcsService.getSignedDownloadUrl(bucketType, filePath, {
         expiresInMinutes,

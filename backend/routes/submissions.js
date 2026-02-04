@@ -1403,7 +1403,7 @@ router.post(
     body("gcsPath").notEmpty().withMessage("gcsPath is required"),
     body("publicUrl").optional().isString(),
     body("uploadedBy").optional().isString(),
-    body("duration_seconds").optional().isNumeric(),
+    body("duration_seconds").optional({ values: "null" }).isNumeric(),
   ],
   handleValidationErrors,
   async (req, res) => {

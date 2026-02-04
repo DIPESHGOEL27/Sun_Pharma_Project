@@ -167,6 +167,7 @@ async function main() {
   console.log("\nSaving database...");
   saveDatabase();
   console.log("Database saved successfully!");
+  process.exit(0);
 }
 
 main().catch(console.error);

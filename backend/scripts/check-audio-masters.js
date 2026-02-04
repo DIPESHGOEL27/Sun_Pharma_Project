@@ -23,6 +23,7 @@ async function main() {
   });
 
   console.log(`Total: ${masters.length} audio masters`);
+  process.exit(0);
 }
 
 main().catch(console.error);

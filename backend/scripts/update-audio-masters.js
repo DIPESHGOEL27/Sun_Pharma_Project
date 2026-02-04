@@ -34,6 +34,40 @@ async function main() {
   await initDatabase();
   const db = getDb();
 
+  // First, clean up duplicate entries - keep only the most recent per language
+  console.log("\nCleaning up duplicate entries...");
+  const duplicates = db
+    .prepare(
+      `
+    SELECT language_code, COUNT(*) as cnt 
+    FROM audio_masters 
+    GROUP BY language_code 
+    HAVING cnt > 1
+  `,
+    )
+    .all();
+
+  for (const dup of duplicates) {
+    // Get IDs to delete (all except the most recent)
+    const toDelete = db
+      .prepare(
+        `
+      SELECT id FROM audio_masters 
+      WHERE language_code = ? 
+      ORDER BY id DESC 
+      LIMIT -1 OFFSET 1
+    `,
+      )
+      .all(dup.language_code);
+
+    for (const row of toDelete) {
+      db.prepare("DELETE FROM audio_masters WHERE id = ?").run(row.id);
+      console.log(
+        `  Deleted duplicate ${dup.language_code} entry with ID: ${row.id}`,
+      );
+    }
+  }
+
   let successCount = 0;
   let errorCount = 0;
 

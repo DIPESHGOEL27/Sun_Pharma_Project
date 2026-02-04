@@ -13,6 +13,7 @@ const { body, param, validationResult } = require("express-validator");
 
 const { getDb } = require("../db/database");
 const logger = require("../utils/logger");
+const { sendWhatsAppTemplate } = require("../utils/gupshup");
 const {
   validateImage,
   validateAudio,
@@ -29,6 +30,32 @@ const {
 } = require("../utils/constants");
 const googleSheetsService = require("../services/googleSheetsService");
 const gcsService = require("../services/gcsService");
+
+const sendMrSubmissionWhatsapp = async ({
+  mrPhone,
+  mrName,
+  doctorName,
+  submissionId,
+}) => {
+  const templateId = process.env.GUPSHUP_TEMPLATE_SUBMISSION_ID;
+  if (!templateId || !mrPhone) return;
+
+  try {
+    await sendWhatsAppTemplate({
+      templateId,
+      destinationNumber: mrPhone,
+      params: [mrName || "", doctorName || "", String(submissionId)],
+    });
+    logger.info(
+      `[WHATSAPP] Submission message sent to MR ${mrPhone} for submission ${submissionId}`,
+    );
+  } catch (error) {
+    logger.error(
+      `[WHATSAPP] Failed to send submission message for ${submissionId}:`,
+      error,
+    );
+  }
+};
 
 // Configure multer for file uploads
 const toPublicUrlFromGcs = (gcsPath) => {
@@ -917,6 +944,16 @@ router.post(
         );
       });
 
+      // Send WhatsApp notification to MR (async, non-blocking)
+      if (mr_phone) {
+        sendMrSubmissionWhatsapp({
+          mrPhone: normalizePhone(mr_phone),
+          mrName: mr_name,
+          doctorName: doctor_name,
+          submissionId: result.submissionId,
+        });
+      }
+
       res.status(201).json({
         message: "Submission created successfully",
         submission_id: result.submissionId,
@@ -1159,6 +1196,16 @@ router.post(
           err,
         );
       });
+
+      // Send WhatsApp notification to MR (async, non-blocking)
+      if (mr_phone) {
+        sendMrSubmissionWhatsapp({
+          mrPhone: normalizePhone(mr_phone),
+          mrName: mr_name,
+          doctorName: doctor_name,
+          submissionId: result.submissionId,
+        });
+      }
 
       res.status(201).json({
         message: "Submission created successfully via GCS",

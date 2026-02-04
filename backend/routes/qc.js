@@ -13,6 +13,7 @@ const logger = require("../utils/logger");
 const { QC_STATUS, SUBMISSION_STATUS } = require("../utils/constants");
 const googleSheetsService = require("../services/googleSheetsService");
 const gcsService = require("../services/gcsService");
+const { sendWhatsAppTemplate } = require("../utils/gupshup");
 
 const toPublicUrlFromGcs = (gcsPath) => {
   if (!gcsPath) return null;
@@ -25,6 +26,51 @@ const toLocalUrl = (type, filePath) => {
   if (!filePath) return null;
   const filename = filePath.split("/").pop();
   return `/api/uploads/${type}/${filename}`;
+};
+
+const getMrPhoneForSubmission = (db, submission) => {
+  if (submission?.mr_id) {
+    const mr = db
+      .prepare("SELECT phone FROM medical_reps WHERE id = ?")
+      .get(submission.mr_id);
+    if (mr?.phone) return mr.phone;
+  }
+
+  if (submission?.mr_code) {
+    const mr = db
+      .prepare("SELECT phone FROM medical_reps WHERE mr_code = ?")
+      .get(submission.mr_code);
+    if (mr?.phone) return mr.phone;
+  }
+
+  return null;
+};
+
+const sendMrFinalVideoWhatsapp = async ({
+  mrPhone,
+  mrName,
+  doctorName,
+  submissionId,
+  finalVideoUrl,
+}) => {
+  const templateId = process.env.GUPSHUP_TEMPLATE_VIDEO_READY_ID;
+  if (!templateId || !mrPhone || !finalVideoUrl) return;
+
+  try {
+    await sendWhatsAppTemplate({
+      templateId,
+      destinationNumber: mrPhone,
+      params: [mrName || "", doctorName || "", String(submissionId), finalVideoUrl],
+    });
+    logger.info(
+      `[WHATSAPP] Final video message sent to MR ${mrPhone} for submission ${submissionId}`,
+    );
+  } catch (error) {
+    logger.error(
+      `[WHATSAPP] Failed to send final video message for ${submissionId}:`,
+      error,
+    );
+  }
 };
 
 const parseAudioFiles = (audioPath) => {
@@ -412,6 +458,24 @@ router.post(
         .catch((err) => {
           logger.error(`[SHEETS] Failed to sync QC approval for ${id}:`, err);
         });
+
+      // Send WhatsApp final video ready notification to MR (async, non-blocking)
+      const finalVideoUrl =
+        submission.final_video_public_url ||
+        toPublicUrlFromGcs(submission.final_video_gcs_path);
+      const mrPhone = getMrPhoneForSubmission(db, submission);
+
+      if (!finalVideoUrl) {
+        logger.warn(`[WHATSAPP] Final video URL missing for submission ${id}`);
+      } else if (mrPhone) {
+        sendMrFinalVideoWhatsapp({
+          mrPhone,
+          mrName: submission.mr_name,
+          doctorName: submission.doctor_name,
+          submissionId: id,
+          finalVideoUrl,
+        });
+      }
 
       logger.info(`[QC] Submission ${id} approved by ${reviewer_name}`);
 

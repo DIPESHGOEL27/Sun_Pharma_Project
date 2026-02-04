@@ -358,7 +358,7 @@ export default function SubmissionDetails() {
       const { data } = await storageApi.getSignedUploadUrl(
         file.name,
         file.type,
-        "GENERATED_VIDEOS",
+        "GENERATED_VIDEO",
         `${submission.id}/${languageCode}`,
       );
 

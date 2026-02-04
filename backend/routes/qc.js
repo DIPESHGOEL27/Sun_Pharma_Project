@@ -53,7 +53,9 @@ const sendMrFinalVideoWhatsapp = async ({
   submissionId,
   finalVideoUrl,
 }) => {
-  const templateId = process.env.GUPSHUP_TEMPLATE_VIDEO_READY_ID;
+  const templateId =
+    process.env.GUPSHUP_VIDEO_READY_TEMPLATE_ID ||
+    process.env.GUPSHUP_TEMPLATE_VIDEO_READY_ID;
   if (!templateId || !mrPhone || !finalVideoUrl) return;
 
   try {

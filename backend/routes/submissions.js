@@ -37,7 +37,9 @@ const sendMrSubmissionWhatsapp = async ({
   doctorName,
   submissionId,
 }) => {
-  const templateId = process.env.GUPSHUP_TEMPLATE_SUBMISSION_ID;
+  const templateId =
+    process.env.GUPSHUP_VIDEO_UPLOAD_SUCCESS_TEMPLATE_ID ||
+    process.env.GUPSHUP_TEMPLATE_SUBMISSION_ID;
   if (!templateId || !mrPhone) return;
 
   try {

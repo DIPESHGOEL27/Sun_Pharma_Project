@@ -34,7 +34,7 @@ async function elevenLabsRequest(endpoint, options = {}) {
     const errorBody = await response.text();
     logger.error(`ElevenLabs API error: ${response.status} - ${errorBody}`);
     throw new Error(
-      `ElevenLabs API error: ${response.status} - ${response.statusText}`
+      `ElevenLabs API error: ${response.status} - ${errorBody || response.statusText}`
     );
   }
 
@@ -138,12 +138,23 @@ async function cloneVoice(name, audioFilePath, description = "") {
 async function deleteVoice(voiceId) {
   logger.info(`[ELEVENLABS] Deleting voice: ${voiceId}`);
 
-  await elevenLabsRequest(`/voices/${voiceId}`, {
-    method: "DELETE",
-  });
+  try {
+    await elevenLabsRequest(`/voices/${voiceId}`, {
+      method: "DELETE",
+    });
 
-  logger.info(`[ELEVENLABS] Voice deleted successfully: ${voiceId}`);
-  return true;
+    logger.info(`[ELEVENLABS] Voice deleted successfully: ${voiceId}`);
+    return true;
+  } catch (error) {
+    const message = error?.message || "";
+    if (message.includes("voice_does_not_exist") || message.includes("404")) {
+      logger.warn(
+        `[ELEVENLABS] Voice already deleted or missing: ${voiceId}`,
+      );
+      return true;
+    }
+    throw error;
+  }
 }
 
 /**

@@ -104,7 +104,7 @@ router.post("/submission-upload-urls", async (req, res) => {
         {
           contentType: imageFile.type || "image/jpeg",
           expiresInMinutes: 30,
-        }
+        },
       );
 
       result.image = {
@@ -128,7 +128,7 @@ router.post("/submission-upload-urls", async (req, res) => {
         {
           contentType: audioFile.type || "audio/mpeg",
           expiresInMinutes: 30,
-        }
+        },
       );
 
       result.audioFiles.push({
@@ -143,7 +143,7 @@ router.post("/submission-upload-urls", async (req, res) => {
     }
 
     logger.info(
-      `[STORAGE] Generated upload URLs for submission prefix: ${submissionPrefix}`
+      `[STORAGE] Generated upload URLs for submission prefix: ${submissionPrefix}`,
     );
 
     res.json(result);
@@ -170,7 +170,7 @@ router.post("/final-video-upload-url", async (req, res) => {
     const db = getDb();
     const submission = db
       .prepare(
-        `SELECT id, submission_prefix, doctor_phone FROM submissions WHERE id = ?`
+        `SELECT id, submission_prefix, doctor_phone FROM submissions WHERE id = ?`,
       )
       .get(submissionId);
 
@@ -187,7 +187,7 @@ router.post("/final-video-upload-url", async (req, res) => {
     // Persist prefix if it was missing so future uploads remain consistent
     if (!submission.submission_prefix) {
       db.prepare(
-        "UPDATE submissions SET submission_prefix = ? WHERE id = ?"
+        "UPDATE submissions SET submission_prefix = ? WHERE id = ?",
       ).run(submissionPrefix, submissionId);
     }
 
@@ -202,7 +202,7 @@ router.post("/final-video-upload-url", async (req, res) => {
         contentType:
           fileType || gcsService.getMimeType(videoPath) || "video/mp4",
         expiresInMinutes: 60,
-      }
+      },
     );
 
     res.json({
@@ -264,7 +264,9 @@ router.post("/signed-download-url", async (req, res) => {
       const foundType = bucketTypes.find(([, name]) => name === bucket);
 
       if (!foundType) {
-        logger.warn(`[STORAGE] Unknown bucket: ${bucket}, falling back to UPLOADS`);
+        logger.warn(
+          `[STORAGE] Unknown bucket: ${bucket}, falling back to UPLOADS`,
+        );
         // Try with UPLOADS bucket as fallback
         result = await gcsService.getSignedDownloadUrl("UPLOADS", file, {
           expiresInMinutes,
@@ -322,7 +324,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       {
         contentType: req.file.mimetype,
         makePublic: makePublic === "true" || makePublic === true,
-      }
+      },
     );
 
     // Clean up temp file
@@ -380,7 +382,7 @@ router.post("/upload-multiple", upload.array("files", 10), async (req, res) => {
           {
             contentType: file.mimetype,
             makePublic: makePublic === "true" || makePublic === true,
-          }
+          },
         );
 
         uploadResults.push({

@@ -62,7 +62,12 @@ const sendMrFinalVideoWhatsapp = async ({
     await sendWhatsAppTemplate({
       templateId,
       destinationNumber: mrPhone,
-      params: [mrName || "", doctorName || "", String(submissionId), finalVideoUrl],
+      params: [
+        mrName || "",
+        doctorName || "",
+        String(submissionId),
+        finalVideoUrl,
+      ],
     });
     logger.info(
       `[WHATSAPP] Final video message sent to MR ${mrPhone} for submission ${submissionId}`,

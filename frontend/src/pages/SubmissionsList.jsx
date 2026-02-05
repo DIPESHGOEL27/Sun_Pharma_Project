@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { submissionsApi } from "../services/api";
+import { submissionsApi, storageApi } from "../services/api";
+import toast from "react-hot-toast";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -287,24 +288,40 @@ export default function SubmissionsList() {
                     </div>
                     <div className="flex items-center gap-2">
                       {entry.audio_url && (
-                        <a
-                          href={entry.audio_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-indigo-600"
+                        <button
+                          onClick={async () => {
+                            try {
+                              toast.loading("Loading...", { id: "media" });
+                              const res = await storageApi.getSignedDownloadUrl(entry.audio_url);
+                              toast.dismiss("media");
+                              window.open(res.data.downloadUrl, "_blank");
+                            } catch (e) {
+                              toast.dismiss("media");
+                              toast.error("Failed to load audio");
+                            }
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800"
                         >
                           <SpeakerWaveIcon className="w-5 h-5" />
-                        </a>
+                        </button>
                       )}
                       {entry.video_url && (
-                        <a
-                          href={entry.video_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-600"
+                        <button
+                          onClick={async () => {
+                            try {
+                              toast.loading("Loading...", { id: "media" });
+                              const res = await storageApi.getSignedDownloadUrl(entry.video_url);
+                              toast.dismiss("media");
+                              window.open(res.data.downloadUrl, "_blank");
+                            } catch (e) {
+                              toast.dismiss("media");
+                              toast.error("Failed to load video");
+                            }
+                          }}
+                          className="text-green-600 hover:text-green-800"
                         >
                           <PlayIcon className="w-5 h-5" />
-                        </a>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -380,26 +397,42 @@ export default function SubmissionsList() {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {entry.audio_url && (
-                            <a
-                              href={entry.audio_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={async () => {
+                                try {
+                                  toast.loading("Loading...", { id: "media" });
+                                  const res = await storageApi.getSignedDownloadUrl(entry.audio_url);
+                                  toast.dismiss("media");
+                                  window.open(res.data.downloadUrl, "_blank");
+                                } catch (e) {
+                                  toast.dismiss("media");
+                                  toast.error("Failed to load audio");
+                                }
+                              }}
                               className="text-indigo-600 hover:text-indigo-800"
                               title="Audio ready"
                             >
                               <SpeakerWaveIcon className="w-5 h-5" />
-                            </a>
+                            </button>
                           )}
                           {entry.video_url && (
-                            <a
-                              href={entry.video_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={async () => {
+                                try {
+                                  toast.loading("Loading...", { id: "media" });
+                                  const res = await storageApi.getSignedDownloadUrl(entry.video_url);
+                                  toast.dismiss("media");
+                                  window.open(res.data.downloadUrl, "_blank");
+                                } catch (e) {
+                                  toast.dismiss("media");
+                                  toast.error("Failed to load video");
+                                }
+                              }}
                               className="text-green-600 hover:text-green-800"
                               title="Video ready"
                             >
                               <PlayIcon className="w-5 h-5" />
-                            </a>
+                            </button>
                           )}
                           {!entry.audio_url && !entry.video_url && (
                             <span className="text-gray-400 text-xs">—</span>

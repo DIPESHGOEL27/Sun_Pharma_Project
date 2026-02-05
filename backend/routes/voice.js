@@ -370,9 +370,10 @@ router.post("/speech-to-speech/:submissionId", async (req, res) => {
           continue;
         }
 
-        // Ensure master audio is available locally
+        // Prefer gcs_path for audio masters (local files may not exist in container)
+        const masterSource = audioMaster.gcs_path || audioMaster.file_path;
         const masterPath = await ensureLocalFile(
-          audioMaster.file_path,
+          masterSource,
           "AUDIO_MASTERS",
         );
         if (isTempFile(masterPath)) tempFiles.push(masterPath);
@@ -593,8 +594,10 @@ router.post("/process/:submissionId", async (req, res) => {
           continue;
         }
 
+        // Prefer gcs_path for audio masters (local files may not exist in container)
+        const masterSource = audioMaster.gcs_path || audioMaster.file_path;
         const masterPath = await ensureLocalFile(
-          audioMaster.file_path,
+          masterSource,
           "AUDIO_MASTERS",
         );
         if (isTempFile(masterPath)) tempFiles.push(masterPath);

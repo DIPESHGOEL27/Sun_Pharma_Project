@@ -34,7 +34,7 @@ async function elevenLabsRequest(endpoint, options = {}) {
     const errorBody = await response.text();
     logger.error(`ElevenLabs API error: ${response.status} - ${errorBody}`);
     throw new Error(
-      `ElevenLabs API error: ${response.status} - ${errorBody || response.statusText}`
+      `ElevenLabs API error: ${response.status} - ${errorBody || response.statusText}`,
     );
   }
 
@@ -76,7 +76,9 @@ async function cloneVoice(name, audioFilePath, description = "") {
     const stats = fs.statSync(p);
     logger.info(`[ELEVENLABS] Audio file: ${p}, size: ${stats.size} bytes`);
     if (stats.size < MIN_FILE_SIZE) {
-      throw new Error(`Audio file too small (${stats.size} bytes): ${path.basename(p)}. Minimum ${MIN_FILE_SIZE} bytes required.`);
+      throw new Error(
+        `Audio file too small (${stats.size} bytes): ${path.basename(p)}. Minimum ${MIN_FILE_SIZE} bytes required.`,
+      );
     }
   }
 
@@ -88,14 +90,13 @@ async function cloneVoice(name, audioFilePath, description = "") {
     form.append("files", fs.createReadStream(p));
   });
 
-
   // Optional: Add labels
   form.append(
     "labels",
     JSON.stringify({
       source: "sun-pharma-video-platform",
       created_at: new Date().toISOString(),
-    })
+    }),
   );
 
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/add`, {
@@ -110,13 +111,17 @@ async function cloneVoice(name, audioFilePath, description = "") {
   if (!response.ok) {
     const errorBody = await response.text();
     logger.error(
-      `[ELEVENLABS] Voice clone failed: ${response.status} - ${errorBody}`
+      `[ELEVENLABS] Voice clone failed: ${response.status} - ${errorBody}`,
     );
     // Parse error body for detailed message
     let detailMessage = response.statusText;
     try {
       const errorJson = JSON.parse(errorBody);
-      detailMessage = errorJson.detail?.message || errorJson.detail || errorJson.message || errorBody;
+      detailMessage =
+        errorJson.detail?.message ||
+        errorJson.detail ||
+        errorJson.message ||
+        errorBody;
     } catch (e) {
       detailMessage = errorBody || response.statusText;
     }
@@ -125,7 +130,7 @@ async function cloneVoice(name, audioFilePath, description = "") {
 
   const result = await response.json();
   logger.info(
-    `[ELEVENLABS] Voice cloned successfully. Voice ID: ${result.voice_id}`
+    `[ELEVENLABS] Voice cloned successfully. Voice ID: ${result.voice_id}`,
   );
 
   return result;
@@ -148,9 +153,7 @@ async function deleteVoice(voiceId) {
   } catch (error) {
     const message = error?.message || "";
     if (message.includes("voice_does_not_exist") || message.includes("404")) {
-      logger.warn(
-        `[ELEVENLABS] Voice already deleted or missing: ${voiceId}`,
-      );
+      logger.warn(`[ELEVENLABS] Voice already deleted or missing: ${voiceId}`);
       return true;
     }
     throw error;
@@ -185,10 +188,10 @@ async function speechToSpeech(
   voiceId,
   sourceAudioPath,
   languageCode = "en",
-  options = {}
+  options = {},
 ) {
   logger.info(
-    `[ELEVENLABS] Starting speech-to-speech. Voice: ${voiceId}, Language: ${languageCode}`
+    `[ELEVENLABS] Starting speech-to-speech. Voice: ${voiceId}, Language: ${languageCode}`,
   );
 
   const fetch = (await import("node-fetch")).default;
@@ -227,19 +230,23 @@ async function speechToSpeech(
         ...form.getHeaders(),
       },
       body: form,
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.text();
     logger.error(
-      `[ELEVENLABS] Speech-to-speech failed: ${response.status} - ${errorBody}`
+      `[ELEVENLABS] Speech-to-speech failed: ${response.status} - ${errorBody}`,
     );
     // Parse error body for detailed message
     let detailMessage = response.statusText;
     try {
       const errorJson = JSON.parse(errorBody);
-      detailMessage = errorJson.detail?.message || errorJson.detail || errorJson.message || errorBody;
+      detailMessage =
+        errorJson.detail?.message ||
+        errorJson.detail ||
+        errorJson.message ||
+        errorBody;
     } catch (e) {
       detailMessage = errorBody || response.statusText;
     }
@@ -248,7 +255,7 @@ async function speechToSpeech(
 
   const audioBuffer = await response.buffer();
   logger.info(
-    `[ELEVENLABS] Speech-to-speech completed. Output size: ${audioBuffer.length} bytes`
+    `[ELEVENLABS] Speech-to-speech completed. Output size: ${audioBuffer.length} bytes`,
   );
 
   return audioBuffer;
@@ -265,10 +272,10 @@ async function speechToSpeechStream(
   voiceId,
   sourceAudioPath,
   outputPath,
-  languageCode = "en"
+  languageCode = "en",
 ) {
   logger.info(
-    `[ELEVENLABS] Starting streamed speech-to-speech. Voice: ${voiceId}`
+    `[ELEVENLABS] Starting streamed speech-to-speech. Voice: ${voiceId}`,
   );
 
   const fetch = (await import("node-fetch")).default;
@@ -296,19 +303,23 @@ async function speechToSpeechStream(
         ...form.getHeaders(),
       },
       body: form,
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.text();
     logger.error(
-      `[ELEVENLABS] Speech-to-speech stream failed: ${response.status} - ${errorBody}`
+      `[ELEVENLABS] Speech-to-speech stream failed: ${response.status} - ${errorBody}`,
     );
     // Parse error body for detailed message
     let detailMessage = response.statusText;
     try {
       const errorJson = JSON.parse(errorBody);
-      detailMessage = errorJson.detail?.message || errorJson.detail || errorJson.message || errorBody;
+      detailMessage =
+        errorJson.detail?.message ||
+        errorJson.detail ||
+        errorJson.message ||
+        errorBody;
     } catch (e) {
       detailMessage = errorBody || response.statusText;
     }
@@ -338,7 +349,7 @@ async function speechToSpeechStream(
  */
 async function textToSpeech(voiceId, text, languageCode = "en", options = {}) {
   logger.info(
-    `[ELEVENLABS] Starting text-to-speech. Voice: ${voiceId}, Language: ${languageCode}`
+    `[ELEVENLABS] Starting text-to-speech. Voice: ${voiceId}, Language: ${languageCode}`,
   );
 
   const langConfig =

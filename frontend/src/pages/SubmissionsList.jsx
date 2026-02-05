@@ -292,7 +292,9 @@ export default function SubmissionsList() {
                           onClick={async () => {
                             try {
                               toast.loading("Loading...", { id: "media" });
-                              const res = await storageApi.getSignedDownloadUrl(entry.audio_url);
+                              const res = await storageApi.getSignedDownloadUrl(
+                                entry.audio_url,
+                              );
                               toast.dismiss("media");
                               window.open(res.data.downloadUrl, "_blank");
                             } catch (e) {
@@ -310,7 +312,9 @@ export default function SubmissionsList() {
                           onClick={async () => {
                             try {
                               toast.loading("Loading...", { id: "media" });
-                              const res = await storageApi.getSignedDownloadUrl(entry.video_url);
+                              const res = await storageApi.getSignedDownloadUrl(
+                                entry.video_url,
+                              );
                               toast.dismiss("media");
                               window.open(res.data.downloadUrl, "_blank");
                             } catch (e) {
@@ -401,7 +405,10 @@ export default function SubmissionsList() {
                               onClick={async () => {
                                 try {
                                   toast.loading("Loading...", { id: "media" });
-                                  const res = await storageApi.getSignedDownloadUrl(entry.audio_url);
+                                  const res =
+                                    await storageApi.getSignedDownloadUrl(
+                                      entry.audio_url,
+                                    );
                                   toast.dismiss("media");
                                   window.open(res.data.downloadUrl, "_blank");
                                 } catch (e) {
@@ -420,7 +427,10 @@ export default function SubmissionsList() {
                               onClick={async () => {
                                 try {
                                   toast.loading("Loading...", { id: "media" });
-                                  const res = await storageApi.getSignedDownloadUrl(entry.video_url);
+                                  const res =
+                                    await storageApi.getSignedDownloadUrl(
+                                      entry.video_url,
+                                    );
                                   toast.dismiss("media");
                                   window.open(res.data.downloadUrl, "_blank");
                                 } catch (e) {

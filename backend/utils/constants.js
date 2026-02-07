@@ -207,8 +207,12 @@ const UPLOAD_CONFIG = {
       "audio/x-wav",
       "audio/x-m4a",
       "audio/mp4",
+      "audio/ogg",
+      "audio/webm",
+      "video/mp4",
+      "video/webm",
     ],
-    allowedExtensions: [".mp3", ".wav", ".m4a"],
+    allowedExtensions: [".mp3", ".wav", ".m4a", ".mp4", ".ogg", ".webm"],
     minDurationSeconds: 60, // 1 minute minimum per file
     maxFilesCount: 5, // Maximum 5 audio files
     minSampleRate: 44100,
@@ -247,7 +251,7 @@ const AUDIO_REQUIREMENTS = {
   DURATION_FORMAT: [
     "Minimum Duration: 1 minute per file",
     "Maximum Files: 5 audio files",
-    "Audio Format: WAV or MP3",
+    "Audio Format: WAV, MP3, M4A, MP4, OGG, or WebM (WhatsApp voice notes supported)",
     "Quality: 44.1 kHz or above",
   ],
   RECORDING_ENVIRONMENT: [
@@ -280,6 +284,13 @@ const GCS_PATHS = {
 // Maximum language selections per submission
 const MAX_LANGUAGE_SELECTIONS = 3;
 
+// Whitelisted email domains for OTP delivery
+// Emails to these domains get priority delivery and enhanced retry logic
+const WHITELISTED_EMAIL_DOMAINS = [
+  "sunpharma.com",
+  "sunpharmaadvancedresearch.com",
+];
+
 module.exports = {
   SUPPORTED_LANGUAGES,
   SUBMISSION_STATUS,
@@ -292,4 +303,5 @@ module.exports = {
   AUDIO_REQUIREMENTS,
   GCS_PATHS,
   MAX_LANGUAGE_SELECTIONS,
+  WHITELISTED_EMAIL_DOMAINS,
 };

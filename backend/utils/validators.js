@@ -181,7 +181,7 @@ async function validateAudio(filePath) {
       result.details.format = ext.replace(".", "").toUpperCase();
     } else {
       result.errors.push(
-        `Audio format '${ext}' not supported. Use MP3, WAV, or M4A`
+        `Audio format '${ext}' not supported. Use MP3, WAV, M4A, MP4, OGG, or WebM`
       );
     }
 

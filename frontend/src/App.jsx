@@ -7,6 +7,7 @@ import AudioMasters from "./pages/AudioMasters";
 import QCDashboard from "./pages/QCDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ConsentVerification from "./pages/ConsentVerification";
+import MRDashboard from "./pages/MRDashboard";
 
 function App() {
   return (
@@ -15,6 +16,9 @@ function App() {
       <Route path="/" element={<DoctorSubmission />} />
       <Route path="/submit" element={<DoctorSubmission />} />
       <Route path="/consent/:submissionId" element={<ConsentVerification />} />
+
+      {/* MR Dashboard - View-only submission tracker */}
+      <Route path="/mr" element={<MRDashboard />} />
 
       {/* Legacy direct submission routes -> redirect to admin namespace */}
       <Route

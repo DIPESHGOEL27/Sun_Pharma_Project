@@ -279,21 +279,35 @@ router.get("/", async (req, res) => {
       params.push(qc_status);
     }
 
+    // Filter by MR code (for MR dashboard)
+    if (req.query.mr_code) {
+      query += " AND m.mr_code = ?";
+      params.push(req.query.mr_code);
+    }
+
     query += " ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
     params.push(parseInt(limit), parseInt(offset));
 
     const submissions = db.prepare(query).all(...params);
 
     // Get total count
-    let countQuery = "SELECT COUNT(*) as total FROM submissions WHERE 1=1";
+    let countQuery = `
+      SELECT COUNT(*) as total FROM submissions s
+      LEFT JOIN medical_reps m ON s.mr_id = m.id
+      WHERE 1=1
+    `;
     const countParams = [];
     if (status) {
-      countQuery += " AND status = ?";
+      countQuery += " AND s.status = ?";
       countParams.push(status);
     }
     if (qc_status) {
-      countQuery += " AND qc_status = ?";
+      countQuery += " AND s.qc_status = ?";
       countParams.push(qc_status);
+    }
+    if (req.query.mr_code) {
+      countQuery += " AND m.mr_code = ?";
+      countParams.push(req.query.mr_code);
     }
     const { total } = db.prepare(countQuery).get(...countParams);
 
@@ -348,6 +362,12 @@ router.get("/by-language", async (req, res) => {
     if (status) {
       baseQuery += " AND s.status = ?";
       params.push(status);
+    }
+
+    // Filter by MR code (for MR dashboard)
+    if (req.query.mr_code) {
+      baseQuery += " AND m.mr_code = ?";
+      params.push(req.query.mr_code);
     }
 
     if (search) {

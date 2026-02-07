@@ -5,6 +5,16 @@
 
 const nodemailer = require("nodemailer");
 const logger = require("../utils/logger");
+const { WHITELISTED_EMAIL_DOMAINS } = require("../utils/constants");
+
+/**
+ * Check if an email domain is whitelisted (e.g. @sunpharma.com)
+ */
+function isWhitelistedDomain(email) {
+  if (!email) return false;
+  const domain = email.split("@")[1]?.toLowerCase();
+  return WHITELISTED_EMAIL_DOMAINS.some((d) => domain === d.toLowerCase());
+}
 
 // Email templates
 const EMAIL_TEMPLATES = {
@@ -530,21 +540,48 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
       }),
     };
 
+    // For whitelisted corporate domains, add enhanced headers to improve deliverability
+    const isWhitelisted = isWhitelistedDomain(doctorEmail);
+    if (isWhitelisted) {
+      mailOptions.headers = {
+        "X-Priority": "1",
+        "X-MSMail-Priority": "High",
+        Importance: "High",
+      };
+      logger.info(
+        `[EMAIL] Whitelisted domain detected for ${doctorEmail} - using priority delivery`
+      );
+    }
+
     logger.info(`[EMAIL] Attempting to send OTP to ${doctorEmail}`, {
       from: fromEmail,
       transport: process.env.AWS_SES_REGION ? "AWS SES" : "SMTP",
+      whitelisted: isWhitelisted,
     });
 
-    const result = await transport.sendMail(mailOptions);
-
-    logger.info(`[EMAIL] OTP sent successfully to ${doctorEmail}`, {
-      messageId: result.messageId,
-    });
-
-    return {
-      success: true,
-      messageId: result.messageId,
-    };
+    // Retry logic for whitelisted domains
+    const maxRetries = isWhitelisted ? 3 : 1;
+    let lastError;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await transport.sendMail(mailOptions);
+        logger.info(`[EMAIL] OTP sent successfully to ${doctorEmail}`, {
+          messageId: result.messageId,
+          attempt,
+          whitelisted: isWhitelisted,
+        });
+        return { success: true, messageId: result.messageId };
+      } catch (sendError) {
+        lastError = sendError;
+        logger.warn(
+          `[EMAIL] Attempt ${attempt}/${maxRetries} failed for ${doctorEmail}: ${sendError.message}`
+        );
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+        }
+      }
+    }
+    throw lastError;
   } catch (error) {
     logger.error(`[EMAIL] Failed to send OTP to ${doctorEmail}:`, error);
     throw new Error(`Failed to send email: ${error.message}`);
@@ -619,5 +656,6 @@ module.exports = {
   sendOTPEmail,
   sendConsentConfirmationEmail,
   verifyEmailConfig,
+  isWhitelistedDomain,
   EMAIL_TEMPLATES,
 };

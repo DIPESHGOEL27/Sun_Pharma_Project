@@ -515,7 +515,11 @@ export default function DoctorSubmission() {
       "audio/wav": [".wav"],
       "audio/x-wav": [".wav"],
       "audio/x-m4a": [".m4a"],
-      "audio/mp4": [".m4a"],
+      "audio/mp4": [".m4a", ".mp4"],
+      "audio/ogg": [".ogg"],
+      "audio/webm": [".webm"],
+      "video/mp4": [".mp4"],
+      "video/webm": [".webm"],
     },
     maxFiles: MAX_AUDIO_FILES,
     maxSize: 100 * 1024 * 1024, // 100MB per file
@@ -1228,7 +1232,7 @@ export default function DoctorSubmission() {
                     >
                       <input
                         {...getAudioInputProps()}
-                        accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/x-m4a"
+                        accept=".mp3,.wav,.m4a,.mp4,.ogg,.webm,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4,audio/ogg,audio/webm,video/mp4,video/webm"
                       />
                       <MicrophoneIcon className="w-10 h-10 mx-auto mb-3 text-gray-400" />
                       <p className="text-sm font-medium text-gray-700 mb-1">
@@ -1237,7 +1241,7 @@ export default function DoctorSubmission() {
                           : `Add more audio files (${audioFiles.length}/${MAX_AUDIO_FILES})`}
                       </p>
                       <p className="text-xs text-gray-500">
-                        MP3, WAV, M4A format • Min 1 minute per file • Up to{" "}
+                        MP3, WAV, M4A, MP4, OGG, WebM • Min 1 minute • Up to{" "}
                         {MAX_AUDIO_FILES} files
                       </p>
                     </div>
@@ -1430,7 +1434,7 @@ export default function DoctorSubmission() {
                     <li>
                       <strong>Minimum 1 minute per file</strong>
                     </li>
-                    <li>Audio Format: WAV or MP3</li>
+                    <li>Audio Format: WAV, MP3, M4A, MP4, OGG, or WebM (WhatsApp voice notes supported)</li>
                     <li>Quality: 44.1 kHz or above</li>
                   </ul>
                 </div>

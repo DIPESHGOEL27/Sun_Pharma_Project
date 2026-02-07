@@ -1348,8 +1348,8 @@ function LanguageStatusCard({
         </div>
       </div>
 
-      {/* Editor: Video Upload */}
-      {adminRole === "editor" && audioComplete && (
+      {/* Editor: Video Upload - only if video not yet completed and not approved */}
+      {adminRole === "editor" && audioComplete && !videoComplete && lang.qc_status !== "approved" && (
         <div className="border-t pt-3 mt-3">
           <div className="text-sm font-medium mb-2">
             Upload Video for {langCode.toUpperCase()}
@@ -1382,8 +1382,8 @@ function LanguageStatusCard({
         </div>
       )}
 
-      {/* Admin: QC Actions - Video Only + Re-upload Photo/Audio */}
-      {adminRole === "admin" && readyForQC && (
+      {/* QC Actions - Video Only + Re-upload Photo/Audio (Admin & Editor) */}
+      {(adminRole === "admin" || adminRole === "editor") && readyForQC && (
         <div className="border-t pt-3 mt-3">
           <div className="text-sm font-medium mb-2">QC Actions</div>
 

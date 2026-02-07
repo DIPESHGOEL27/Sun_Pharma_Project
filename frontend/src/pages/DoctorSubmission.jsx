@@ -1408,6 +1408,18 @@ export default function DoctorSubmission() {
                     <li>File size: Up to 10 MB</li>
                   </ul>
                 </div>
+                {/* Sample Doctor Photo */}
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-800 mb-1">📸 Sample Doctor Photo</p>
+                  <a
+                    href="/samples/Sample_Doctor_Photo.jpeg"
+                    download="Sample_Doctor_Photo.jpeg"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <PhotoIcon className="w-3.5 h-3.5" />
+                    Download Sample Photo
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -1438,6 +1450,18 @@ export default function DoctorSubmission() {
                     </li>
                     <li>Quality: 44.1 kHz or above</li>
                   </ul>
+                </div>
+                {/* Sample Audio File */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-800 mb-1">🎙️ Sample Audio Recording</p>
+                  <a
+                    href="/samples/Sample_Audio.wav"
+                    download="Sample_Audio.wav"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <MicrophoneIcon className="w-3.5 h-3.5" />
+                    Download Sample Audio
+                  </a>
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5 mb-1.5">

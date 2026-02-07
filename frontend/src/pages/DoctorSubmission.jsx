@@ -697,9 +697,8 @@ export default function DoctorSubmission() {
       toast.dismiss("create-submission");
       toast.success("Submission created successfully!", { duration: 3000 });
 
-      // Clear saved form data on successful submission
-      sessionStorage.removeItem('submissionFormData');
-      sessionStorage.removeItem('submissionSelectedLanguages');
+      // Keep form data in sessionStorage so MR can go back and fix details if needed
+      // Data is cleared on logout or when starting a fresh submission
 
       // Redirect to consent verification
       navigate(`/consent/${res.data.submission_id}`);

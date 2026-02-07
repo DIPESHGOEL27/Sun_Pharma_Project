@@ -180,6 +180,10 @@ export default function ConsentVerification() {
 
       toast.success("Consent verified and submitted successfully!");
       setConsentComplete(true);
+
+      // Clear saved submission form data now that consent is complete
+      sessionStorage.removeItem('submissionFormData');
+      sessionStorage.removeItem('submissionSelectedLanguages');
     } catch (error) {
       console.error("Verification error:", error);
       toast.error(error.response?.data?.error || "Verification failed");

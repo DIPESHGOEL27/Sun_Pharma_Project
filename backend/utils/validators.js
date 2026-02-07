@@ -49,7 +49,7 @@ async function validateImage(filePath) {
     // Check file size
     if (stats.size > UPLOAD_CONFIG.IMAGE.maxSizeBytes) {
       result.errors.push(
-        `Image size (${result.details.fileSizeMB}MB) exceeds maximum (${UPLOAD_CONFIG.IMAGE.maxSizeMB}MB)`
+        `Image size (${result.details.fileSizeMB}MB) exceeds maximum (${UPLOAD_CONFIG.IMAGE.maxSizeMB}MB)`,
       );
     } else {
       result.checks.size = true;
@@ -69,7 +69,7 @@ async function validateImage(filePath) {
       result.checks.format = true;
     } else {
       result.errors.push(
-        `Image format '${metadata.format}' not supported. Use JPG or PNG`
+        `Image format '${metadata.format}' not supported. Use JPG or PNG`,
       );
     }
 
@@ -82,7 +82,7 @@ async function validateImage(filePath) {
       metadata.height < UPLOAD_CONFIG.IMAGE.recommendedHeight
     ) {
       result.warnings.push(
-        `For best results, use at least ${UPLOAD_CONFIG.IMAGE.recommendedWidth}x${UPLOAD_CONFIG.IMAGE.recommendedHeight} resolution`
+        `For best results, use at least ${UPLOAD_CONFIG.IMAGE.recommendedWidth}x${UPLOAD_CONFIG.IMAGE.recommendedHeight} resolution`,
       );
     }
 
@@ -101,7 +101,7 @@ async function validateImage(filePath) {
       result.warnings.push("Image appears too dark. Ensure good lighting");
     } else {
       result.warnings.push(
-        "Image appears overexposed. Avoid direct backlighting"
+        "Image appears overexposed. Avoid direct backlighting",
       );
     }
 
@@ -114,7 +114,7 @@ async function validateImage(filePath) {
     result.checks.plainBackground = true; // Placeholder - requires ML
 
     result.warnings.push(
-      "Face detection, pose verification, and background check will be performed during QC review"
+      "Face detection, pose verification, and background check will be performed during QC review",
     );
 
     // Calculate overall validity
@@ -168,7 +168,7 @@ async function validateAudio(filePath) {
     // Check file size
     if (stats.size > UPLOAD_CONFIG.AUDIO.maxSizeBytes) {
       result.errors.push(
-        `Audio size (${result.details.fileSizeMB}MB) exceeds maximum (${UPLOAD_CONFIG.AUDIO.maxSizeMB}MB)`
+        `Audio size (${result.details.fileSizeMB}MB) exceeds maximum (${UPLOAD_CONFIG.AUDIO.maxSizeMB}MB)`,
       );
     } else {
       result.checks.size = true;
@@ -181,7 +181,7 @@ async function validateAudio(filePath) {
       result.details.format = ext.replace(".", "").toUpperCase();
     } else {
       result.errors.push(
-        `Audio format '${ext}' not supported. Use MP3, WAV, M4A, MP4, OGG, or WebM`
+        `Audio format '${ext}' not supported. Use MP3, WAV, M4A, MP4, OGG, or WebM`,
       );
     }
 
@@ -189,7 +189,7 @@ async function validateAudio(filePath) {
     try {
       const ffprobeOutput = execSync(
         `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
-        { encoding: "utf8" }
+        { encoding: "utf8" },
       );
       const ffprobeData = JSON.parse(ffprobeOutput);
 
@@ -203,13 +203,13 @@ async function validateAudio(filePath) {
         result.checks.duration = true;
       } else {
         result.errors.push(
-          `Audio duration (${result.details.durationFormatted}) is less than minimum (1 minute)`
+          `Audio duration (${result.details.durationFormatted}) is less than minimum (1 minute)`,
         );
       }
 
       // Extract audio stream info
       const audioStream = ffprobeData.streams?.find(
-        (s) => s.codec_type === "audio"
+        (s) => s.codec_type === "audio",
       );
       if (audioStream) {
         result.details.sampleRate = parseInt(audioStream.sample_rate);
@@ -224,14 +224,14 @@ async function validateAudio(filePath) {
           result.checks.sampleRate = true;
         } else {
           result.warnings.push(
-            `Sample rate (${result.details.sampleRate}Hz) below recommended (${UPLOAD_CONFIG.AUDIO.minSampleRate}Hz)`
+            `Sample rate (${result.details.sampleRate}Hz) below recommended (${UPLOAD_CONFIG.AUDIO.minSampleRate}Hz)`,
           );
         }
       }
     } catch (ffprobeError) {
       // ffprobe not available, try alternative method or skip duration check
       result.warnings.push(
-        "Could not analyze audio metadata (ffprobe not available). Duration check will be performed during processing."
+        "Could not analyze audio metadata (ffprobe not available). Duration check will be performed during processing.",
       );
       result.checks.duration = true; // Allow to proceed, will be checked later
       result.checks.sampleRate = true;
@@ -242,7 +242,7 @@ async function validateAudio(filePath) {
     result.checks.noBackgroundNoise = true; // Placeholder - requires ML analysis
     result.checks.speechClarity = true; // Placeholder - requires ML analysis
     result.warnings.push(
-      "Audio quality (noise, clarity) will be verified during QC review"
+      "Audio quality (noise, clarity) will be verified during QC review",
     );
 
     // Calculate overall validity
@@ -347,7 +347,7 @@ function validateLanguageCodes(codes, maxSelections = 3) {
   if (result.invalidCodes.length > 0) {
     result.isValid = false;
     result.errors.push(
-      `Invalid language codes: ${result.invalidCodes.join(", ")}`
+      `Invalid language codes: ${result.invalidCodes.join(", ")}`,
     );
   }
 

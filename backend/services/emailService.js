@@ -63,7 +63,7 @@ async function createTransporter() {
       logger.error(
         "[EMAIL] AWS SES initialization failed:",
         error.message,
-        error.stack
+        error.stack,
       );
     }
   }
@@ -88,7 +88,7 @@ async function createTransporter() {
 
   // No email configuration - log warning
   logger.warn(
-    "[EMAIL] No email service configured! Set AWS_SES_REGION or SMTP credentials."
+    "[EMAIL] No email service configured! Set AWS_SES_REGION or SMTP credentials.",
   );
   return null;
 }
@@ -515,10 +515,10 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
 
     if (!transport) {
       logger.error(
-        `[EMAIL] No email transport configured. Cannot send OTP to ${doctorEmail}`
+        `[EMAIL] No email transport configured. Cannot send OTP to ${doctorEmail}`,
       );
       throw new Error(
-        "Email service not configured. Please contact administrator."
+        "Email service not configured. Please contact administrator.",
       );
     }
 
@@ -549,7 +549,7 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
         Importance: "High",
       };
       logger.info(
-        `[EMAIL] Whitelisted domain detected for ${doctorEmail} - using priority delivery`
+        `[EMAIL] Whitelisted domain detected for ${doctorEmail} - using priority delivery`,
       );
     }
 
@@ -574,7 +574,7 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
       } catch (sendError) {
         lastError = sendError;
         logger.warn(
-          `[EMAIL] Attempt ${attempt}/${maxRetries} failed for ${doctorEmail}: ${sendError.message}`
+          `[EMAIL] Attempt ${attempt}/${maxRetries} failed for ${doctorEmail}: ${sendError.message}`,
         );
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, 2000 * attempt));
@@ -597,7 +597,7 @@ async function sendOTPEmail(doctorEmail, doctorName, otp, options = {}) {
 async function sendConsentConfirmationEmail(
   doctorEmail,
   doctorName,
-  submissionId
+  submissionId,
 ) {
   try {
     const transport = await getTransporter();
@@ -631,7 +631,7 @@ async function sendConsentConfirmationEmail(
   } catch (error) {
     logger.error(
       `[EMAIL] Failed to send confirmation to ${doctorEmail}:`,
-      error
+      error,
     );
     throw new Error(`Failed to send email: ${error.message}`);
   }

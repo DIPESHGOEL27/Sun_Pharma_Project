@@ -1434,7 +1434,10 @@ export default function DoctorSubmission() {
                     <li>
                       <strong>Minimum 1 minute per file</strong>
                     </li>
-                    <li>Audio Format: WAV, MP3, M4A, MP4, OGG, or WebM (WhatsApp voice notes supported)</li>
+                    <li>
+                      Audio Format: WAV, MP3, M4A, MP4, OGG, or WebM (WhatsApp
+                      voice notes supported)
+                    </li>
                     <li>Quality: 44.1 kHz or above</li>
                   </ul>
                 </div>

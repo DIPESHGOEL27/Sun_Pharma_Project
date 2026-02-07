@@ -83,7 +83,7 @@ function MRLoginScreen({ onLoginSuccess }) {
     try {
       const res = await adminApi.mrLogin(email, empCode);
       const mrData = res.data;
-      sessionStorage.setItem("mrDashboardSession", JSON.stringify(mrData));
+      sessionStorage.setItem("mrSession", JSON.stringify(mrData));
       toast.success(`Welcome, ${mrData.name}!`);
       onLoginSuccess(mrData);
     } catch (err) {
@@ -252,12 +252,12 @@ export default function MRDashboard() {
 
   // Check for existing session on mount
   useEffect(() => {
-    const stored = sessionStorage.getItem("mrDashboardSession");
+    const stored = sessionStorage.getItem("mrSession");
     if (stored) {
       try {
         setMrData(JSON.parse(stored));
       } catch {
-        sessionStorage.removeItem("mrDashboardSession");
+        sessionStorage.removeItem("mrSession");
       }
     }
   }, []);
@@ -303,7 +303,7 @@ export default function MRDashboard() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem("mrDashboardSession");
+    sessionStorage.removeItem("mrSession");
     setMrData(null);
     setEntries([]);
     toast.success("Logged out");
@@ -335,11 +335,7 @@ export default function MRDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <img
-                src="/sustencaplogo.jpg"
-                alt="Logo"
-                className="h-10"
-              />
+              <img src="/sustencaplogo.jpg" alt="Logo" className="h-10" />
               <div>
                 <h1 className="text-lg font-bold text-gray-900">
                   My Submissions
@@ -381,12 +377,16 @@ export default function MRDashboard() {
           />
           <StatCard
             label="Audio Ready"
-            value={entries.filter((e) => e.language_status === "audio_ready").length}
+            value={
+              entries.filter((e) => e.language_status === "audio_ready").length
+            }
             color="cyan"
           />
           <StatCard
             label="Video Ready"
-            value={entries.filter((e) => e.language_status === "video_ready").length}
+            value={
+              entries.filter((e) => e.language_status === "video_ready").length
+            }
             color="emerald"
           />
           <StatCard
@@ -395,7 +395,7 @@ export default function MRDashboard() {
               entries.filter(
                 (e) =>
                   e.language_status === "pending" ||
-                  e.language_status === "pending_consent"
+                  e.language_status === "pending_consent",
               ).length
             }
             color="yellow"
@@ -454,7 +454,9 @@ export default function MRDashboard() {
               </select>
               <select
                 value={filters.qc_status}
-                onChange={(e) => handleFilterChange("qc_status", e.target.value)}
+                onChange={(e) =>
+                  handleFilterChange("qc_status", e.target.value)
+                }
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none text-sm"
               >
                 {QC_STATUS_OPTIONS.map((opt) => (
@@ -526,16 +528,10 @@ export default function MRDashboard() {
                       </div>
                       <div className="flex items-center gap-2">
                         {entry.audio_url && (
-                          <MediaButton
-                            type="audio"
-                            gcsPath={entry.audio_url}
-                          />
+                          <MediaButton type="audio" gcsPath={entry.audio_url} />
                         )}
                         {entry.video_url && (
-                          <MediaButton
-                            type="video"
-                            gcsPath={entry.video_url}
-                          />
+                          <MediaButton type="video" gcsPath={entry.video_url} />
                         )}
                       </div>
                     </div>
@@ -674,9 +670,7 @@ function StatCard({ label, value, color }) {
     yellow: "bg-yellow-50 text-yellow-700 border-yellow-200",
   };
   return (
-    <div
-      className={`rounded-xl border p-4 ${colors[color] || colors.blue}`}
-    >
+    <div className={`rounded-xl border p-4 ${colors[color] || colors.blue}`}>
       <p className="text-2xl font-bold">{value}</p>
       <p className="text-xs font-medium mt-1">{label}</p>
     </div>

@@ -1382,28 +1382,32 @@ function LanguageStatusCard({
         </div>
       )}
 
-      {/* QC Actions - Video Only + Re-upload Photo/Audio (Admin & Editor) */}
-      {(adminRole === "admin" || adminRole === "editor") && readyForQC && (
+      {/* QC Actions (Admin & Editor) */}
+      {(adminRole === "admin" || adminRole === "editor") && audioComplete && lang.qc_status !== "approved" && (
         <div className="border-t pt-3 mt-3">
           <div className="text-sm font-medium mb-2">QC Actions</div>
 
           {!showRejectForm ? (
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => onApprove(langCode, false, true)}
-                disabled={actionLoading === `approve-${langCode}`}
-                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
-              >
-                <CheckCircleIcon className="w-4 h-4" />
-                {actionLoading === `approve-${langCode}`
-                  ? "Approving..."
-                  : "Approve Video"}
-              </button>
+              {/* Approve Video - only when video is ready */}
+              {readyForQC && (
+                <button
+                  onClick={() => onApprove(langCode, false, true)}
+                  disabled={actionLoading === `approve-${langCode}`}
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <CheckCircleIcon className="w-4 h-4" />
+                  {actionLoading === `approve-${langCode}`
+                    ? "Approving..."
+                    : "Approve Video"}
+                </button>
+              )}
+              {/* Reject dropdown - always available once audio is complete */}
               <button
                 onClick={() => setShowRejectForm(true)}
                 className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
               >
-                Reject
+                Request Re-upload
               </button>
             </div>
           ) : (
@@ -1411,29 +1415,29 @@ function LanguageStatusCard({
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Rejection reason (required)"
+                placeholder="Reason for re-upload (required)"
                 className="w-full p-2 text-sm border rounded"
                 rows={2}
               />
               <div className="flex flex-wrap items-center gap-2">
+                {readyForQC && (
+                  <button
+                    onClick={() => {
+                      onReject(langCode, false, true, rejectReason);
+                      setShowRejectForm(false);
+                      setRejectReason("");
+                    }}
+                    disabled={
+                      !rejectReason || actionLoading === `reject-${langCode}`
+                    }
+                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Re-upload Video
+                  </button>
+                )}
                 <button
                   onClick={() => {
-                    onReject(langCode, false, true, rejectReason);
-                    setShowRejectForm(false);
-                    setRejectReason("");
-                  }}
-                  disabled={
-                    !rejectReason || actionLoading === `reject-${langCode}`
-                  }
-                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  {actionLoading === `reject-${langCode}`
-                    ? "Rejecting..."
-                    : "Re-upload Video"}
-                </button>
-                <button
-                  onClick={() => {
-                    onReject(langCode, true, false, rejectReason);
+                    onReject(langCode, false, false, `Re-upload Photo: ${rejectReason}`);
                     setShowRejectForm(false);
                     setRejectReason("");
                   }}
@@ -1446,7 +1450,7 @@ function LanguageStatusCard({
                 </button>
                 <button
                   onClick={() => {
-                    onReject(langCode, true, false, rejectReason);
+                    onReject(langCode, false, false, `Re-upload Audio: ${rejectReason}`);
                     setShowRejectForm(false);
                     setRejectReason("");
                   }}

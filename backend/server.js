@@ -20,6 +20,9 @@ const storageRoutes = require("./routes/storage");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy (behind nginx) - required for correct rate limiting by real client IP
+app.set("trust proxy", 1);
+
 // Security middleware
 app.use(helmet());
 app.use(
@@ -29,11 +32,13 @@ app.use(
   })
 );
 
-// Rate limiting
+// Rate limiting - per real client IP (trust proxy ensures X-Forwarded-For is used)
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
   message: { error: "Too many requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use("/api", limiter);
 

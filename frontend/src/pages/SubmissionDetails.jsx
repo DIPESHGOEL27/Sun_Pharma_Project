@@ -1349,132 +1349,147 @@ function LanguageStatusCard({
       </div>
 
       {/* Editor: Video Upload - only if video not yet completed and not approved */}
-      {adminRole === "editor" && audioComplete && !videoComplete && lang.qc_status !== "approved" && (
-        <div className="border-t pt-3 mt-3">
-          <div className="text-sm font-medium mb-2">
-            Upload Video for {langCode.toUpperCase()}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="file"
-              accept="video/*"
-              onChange={(e) =>
-                setPerLanguageVideoFiles((prev) => ({
-                  ...prev,
-                  [langCode]: e.target.files?.[0] || null,
-                }))
-              }
-              className="text-xs flex-1"
-            />
-            <button
-              onClick={() => onUpload(langCode)}
-              disabled={
-                !perLanguageVideoFiles[langCode] ||
-                actionLoading === `upload-${langCode}`
-              }
-              className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-            >
-              {actionLoading === `upload-${langCode}`
-                ? `${perLanguageUploadProgress[langCode] || 0}%`
-                : "Upload"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* QC Actions (Admin & Editor) */}
-      {(adminRole === "admin" || adminRole === "editor") && audioComplete && lang.qc_status !== "approved" && (
-        <div className="border-t pt-3 mt-3">
-          <div className="text-sm font-medium mb-2">QC Actions</div>
-
-          {!showRejectForm ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Approve Video - only when video is ready */}
-              {readyForQC && (
-                <button
-                  onClick={() => onApprove(langCode, false, true)}
-                  disabled={actionLoading === `approve-${langCode}`}
-                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
-                >
-                  <CheckCircleIcon className="w-4 h-4" />
-                  {actionLoading === `approve-${langCode}`
-                    ? "Approving..."
-                    : "Approve Video"}
-                </button>
-              )}
-              {/* Reject dropdown - always available once audio is complete */}
+      {adminRole === "editor" &&
+        audioComplete &&
+        !videoComplete &&
+        lang.qc_status !== "approved" && (
+          <div className="border-t pt-3 mt-3">
+            <div className="text-sm font-medium mb-2">
+              Upload Video for {langCode.toUpperCase()}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) =>
+                  setPerLanguageVideoFiles((prev) => ({
+                    ...prev,
+                    [langCode]: e.target.files?.[0] || null,
+                  }))
+                }
+                className="text-xs flex-1"
+              />
               <button
-                onClick={() => setShowRejectForm(true)}
-                className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                onClick={() => onUpload(langCode)}
+                disabled={
+                  !perLanguageVideoFiles[langCode] ||
+                  actionLoading === `upload-${langCode}`
+                }
+                className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
               >
-                Request Re-upload
+                {actionLoading === `upload-${langCode}`
+                  ? `${perLanguageUploadProgress[langCode] || 0}%`
+                  : "Upload"}
               </button>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Reason for re-upload (required)"
-                className="w-full p-2 text-sm border rounded"
-                rows={2}
-              />
+          </div>
+        )}
+
+      {/* QC Actions (Admin & Editor) */}
+      {(adminRole === "admin" || adminRole === "editor") &&
+        audioComplete &&
+        lang.qc_status !== "approved" && (
+          <div className="border-t pt-3 mt-3">
+            <div className="text-sm font-medium mb-2">QC Actions</div>
+
+            {!showRejectForm ? (
               <div className="flex flex-wrap items-center gap-2">
+                {/* Approve Video - only when video is ready */}
                 {readyForQC && (
                   <button
+                    onClick={() => onApprove(langCode, false, true)}
+                    disabled={actionLoading === `approve-${langCode}`}
+                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" />
+                    {actionLoading === `approve-${langCode}`
+                      ? "Approving..."
+                      : "Approve Video"}
+                  </button>
+                )}
+                {/* Reject dropdown - always available once audio is complete */}
+                <button
+                  onClick={() => setShowRejectForm(true)}
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Request Re-upload
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Reason for re-upload (required)"
+                  className="w-full p-2 text-sm border rounded"
+                  rows={2}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  {readyForQC && (
+                    <button
+                      onClick={() => {
+                        onReject(langCode, false, true, rejectReason);
+                        setShowRejectForm(false);
+                        setRejectReason("");
+                      }}
+                      disabled={
+                        !rejectReason || actionLoading === `reject-${langCode}`
+                      }
+                      className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Re-upload Video
+                    </button>
+                  )}
+                  <button
                     onClick={() => {
-                      onReject(langCode, false, true, rejectReason);
+                      onReject(
+                        langCode,
+                        false,
+                        false,
+                        `Re-upload Photo: ${rejectReason}`,
+                      );
                       setShowRejectForm(false);
                       setRejectReason("");
                     }}
                     disabled={
                       !rejectReason || actionLoading === `reject-${langCode}`
                     }
-                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                    className="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
                   >
-                    Re-upload Video
+                    Re-upload Photo
                   </button>
-                )}
-                <button
-                  onClick={() => {
-                    onReject(langCode, false, false, `Re-upload Photo: ${rejectReason}`);
-                    setShowRejectForm(false);
-                    setRejectReason("");
-                  }}
-                  disabled={
-                    !rejectReason || actionLoading === `reject-${langCode}`
-                  }
-                  className="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
-                >
-                  Re-upload Photo
-                </button>
-                <button
-                  onClick={() => {
-                    onReject(langCode, false, false, `Re-upload Audio: ${rejectReason}`);
-                    setShowRejectForm(false);
-                    setRejectReason("");
-                  }}
-                  disabled={
-                    !rejectReason || actionLoading === `reject-${langCode}`
-                  }
-                  className="px-3 py-1 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
-                >
-                  Re-upload Audio
-                </button>
-                <button
-                  onClick={() => {
-                    setShowRejectForm(false);
-                    setRejectReason("");
-                  }}
-                  className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
+                  <button
+                    onClick={() => {
+                      onReject(
+                        langCode,
+                        false,
+                        false,
+                        `Re-upload Audio: ${rejectReason}`,
+                      );
+                      setShowRejectForm(false);
+                      setRejectReason("");
+                    }}
+                    disabled={
+                      !rejectReason || actionLoading === `reject-${langCode}`
+                    }
+                    className="px-3 py-1 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    Re-upload Audio
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRejectForm(false);
+                      setRejectReason("");
+                    }}
+                    className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
     </div>
   );
 }

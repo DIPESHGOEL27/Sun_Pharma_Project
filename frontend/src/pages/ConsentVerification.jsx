@@ -11,6 +11,7 @@ import {
   DocumentTextIcon,
   PhoneIcon,
   ExclamationTriangleIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper function to strip "Dr." prefix from name if already present
@@ -29,6 +30,10 @@ export default function ConsentVerification() {
   // Consent state
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentComplete, setConsentComplete] = useState(false);
+
+  // Email editing state
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [editedEmail, setEditedEmail] = useState("");
 
   // OTP state
   const [otpSent, setOtpSent] = useState(false);
@@ -431,11 +436,74 @@ export default function ConsentVerification() {
                     Dr. {stripDrPrefix(submission?.doctor_name)}
                   </span>
                 </div>
-                <div>
+                <div className="flex items-center gap-1">
                   <span className="text-blue-600">Email:</span>{" "}
-                  <span className="font-medium text-blue-900">
-                    {submission?.doctor_email}
-                  </span>
+                  {editingEmail ? (
+                    <span className="inline-flex items-center gap-2">
+                      <input
+                        type="email"
+                        value={editedEmail}
+                        onChange={(e) => setEditedEmail(e.target.value)}
+                        className="px-2 py-1 border border-blue-300 rounded-md text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 w-56"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && editedEmail.trim()) {
+                            setSubmission(prev => ({
+                              ...prev,
+                              doctor_email_full: editedEmail.trim(),
+                              doctor_email: editedEmail.trim(),
+                            }));
+                            setEditingEmail(false);
+                            toast.success('Email updated. Send OTP to verify.');
+                          } else if (e.key === 'Escape') {
+                            setEditingEmail(false);
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (!editedEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedEmail.trim())) {
+                            toast.error('Please enter a valid email address');
+                            return;
+                          }
+                          setSubmission(prev => ({
+                            ...prev,
+                            doctor_email_full: editedEmail.trim(),
+                            doctor_email: editedEmail.trim(),
+                          }));
+                          setEditingEmail(false);
+                          toast.success('Email updated. Send OTP to verify.');
+                        }}
+                        className="text-green-600 hover:text-green-700 font-medium text-xs px-2 py-1 bg-green-50 rounded"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingEmail(false)}
+                        className="text-gray-500 hover:text-gray-700 text-xs px-2 py-1"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="font-medium text-blue-900">
+                        {submission?.doctor_email_full || submission?.doctor_email}
+                      </span>
+                      {!otpSent && (
+                        <button
+                          onClick={() => {
+                            setEditedEmail(submission?.doctor_email_full || '');
+                            setEditingEmail(true);
+                          }}
+                          className="text-blue-500 hover:text-blue-700 ml-1"
+                          title="Edit email"
+                        >
+                          <PencilSquareIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </div>
                 {submission?.doctor_specialization && (
                   <div>
@@ -621,12 +689,22 @@ export default function ConsentVerification() {
                   <div className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm mb-3">
                       <CheckCircleIcon className="w-4 h-4" />
-                      OTP sent to {submission?.doctor_email}
+                      OTP sent to {submission?.doctor_email_full || submission?.doctor_email}
                     </div>
                     <p className="text-gray-600">
                       Please enter the 6-digit verification code sent to the
                       doctor's email
                     </p>
+                    <button
+                      onClick={() => {
+                        setOtpSent(false);
+                        setOtp(["", "", "", "", "", ""]);
+                      }}
+                      className="text-blue-600 hover:text-blue-700 text-xs mt-2 inline-flex items-center gap-1"
+                    >
+                      <PencilSquareIcon className="w-3.5 h-3.5" />
+                      Wrong email? Change it
+                    </button>
                   </div>
 
                   {/* OTP Input */}

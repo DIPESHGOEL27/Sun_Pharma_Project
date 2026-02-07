@@ -333,11 +333,11 @@ export default function MRDashboard() {
       {/* Top Bar */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 sm:h-16 gap-3 sm:gap-0">
             <div className="flex items-center gap-3">
-              <img src="/sustencaplogo.jpg" alt="Logo" className="h-10" />
+              <img src="/sustencaplogo.jpg" alt="Logo" className="h-8 sm:h-10" />
               <div>
-                <h1 className="text-lg font-bold text-gray-900">
+                <h1 className="text-base sm:text-lg font-bold text-gray-900">
                   My Submissions
                 </h1>
                 <p className="text-xs text-gray-500">
@@ -346,17 +346,17 @@ export default function MRDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Link
                 to="/submit"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
               >
                 <PlusIcon className="w-4 h-4" />
                 New Submission
               </Link>
               <button
                 onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-red-600 hover:bg-red-50 border border-red-200 text-sm font-medium rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-2 text-red-600 hover:bg-red-50 border border-red-200 text-xs sm:text-sm font-medium rounded-lg transition-colors"
               >
                 <ArrowRightOnRectangleIcon className="w-4 h-4" />
                 Logout

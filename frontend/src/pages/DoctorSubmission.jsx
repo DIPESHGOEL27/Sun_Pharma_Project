@@ -518,8 +518,6 @@ export default function DoctorSubmission() {
       "audio/mp4": [".m4a", ".mp4"],
       "audio/ogg": [".ogg"],
       "audio/webm": [".webm"],
-      "video/mp4": [".mp4"],
-      "video/webm": [".webm"],
     },
     maxFiles: MAX_AUDIO_FILES,
     maxSize: 100 * 1024 * 1024, // 100MB per file
@@ -1232,7 +1230,7 @@ export default function DoctorSubmission() {
                     >
                       <input
                         {...getAudioInputProps()}
-                        accept=".mp3,.wav,.m4a,.mp4,.ogg,.webm,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4,audio/ogg,audio/webm,video/mp4,video/webm"
+                        accept=".mp3,.wav,.m4a,.mp4,.ogg,.webm,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4,audio/ogg,audio/webm"
                       />
                       <MicrophoneIcon className="w-10 h-10 mx-auto mb-3 text-gray-400" />
                       <p className="text-sm font-medium text-gray-700 mb-1">

@@ -209,8 +209,6 @@ const UPLOAD_CONFIG = {
       "audio/mp4",
       "audio/ogg",
       "audio/webm",
-      "video/mp4",
-      "video/webm",
     ],
     allowedExtensions: [".mp3", ".wav", ".m4a", ".mp4", ".ogg", ".webm"],
     minDurationSeconds: 60, // 1 minute minimum per file

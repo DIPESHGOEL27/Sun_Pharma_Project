@@ -1036,41 +1036,7 @@ export default function SubmissionDetails() {
             </div>
           )}
 
-          {/* QC Actions - Admin Only */}
-          {adminRole === "admin" && (
-            <div className="card space-y-4">
-              <h3 className="font-semibold text-gray-900">QC Actions</h3>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-700">Action</div>
-                <select
-                  value={editorAction}
-                  onChange={(e) => setEditorAction(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select action</option>
-                  <option value="approve">Approve</option>
-                  <option value="reupload">Request Re-upload</option>
-                  <option value="regenerate">Request Regeneration</option>
-                </select>
-                <textarea
-                  value={editorNotes}
-                  onChange={(e) => setEditorNotes(e.target.value)}
-                  rows={3}
-                  className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                  placeholder="Notes (optional)"
-                />
-                <button
-                  onClick={handleEditorAction}
-                  disabled={!editorAction || actionLoading === "editor-action"}
-                  className="btn-secondary w-full justify-center disabled:opacity-50"
-                >
-                  {actionLoading === "editor-action"
-                    ? "Applying..."
-                    : "Apply QC Action"}
-                </button>
-              </div>
-            </div>
-          )}
+          {/* QC Actions - Moved to per-language section */}
         </div>
       </div>
     </div>
@@ -1416,22 +1382,22 @@ function LanguageStatusCard({
         </div>
       )}
 
-      {/* Admin: QC Actions */}
+      {/* Admin: QC Actions - Video Only + Re-upload Photo/Audio */}
       {adminRole === "admin" && readyForQC && (
         <div className="border-t pt-3 mt-3">
           <div className="text-sm font-medium mb-2">QC Actions</div>
 
           {!showRejectForm ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => onApprove(langCode, true, true)}
+                onClick={() => onApprove(langCode, false, true)}
                 disabled={actionLoading === `approve-${langCode}`}
                 className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
               >
                 <CheckCircleIcon className="w-4 h-4" />
                 {actionLoading === `approve-${langCode}`
                   ? "Approving..."
-                  : "Approve Both"}
+                  : "Approve Video"}
               </button>
               <button
                 onClick={() => setShowRejectForm(true)}
@@ -1449,10 +1415,10 @@ function LanguageStatusCard({
                 className="w-full p-2 text-sm border rounded"
                 rows={2}
               />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => {
-                    onReject(langCode, true, true, rejectReason);
+                    onReject(langCode, false, true, rejectReason);
                     setShowRejectForm(false);
                     setRejectReason("");
                   }}
@@ -1463,7 +1429,33 @@ function LanguageStatusCard({
                 >
                   {actionLoading === `reject-${langCode}`
                     ? "Rejecting..."
-                    : "Confirm Reject"}
+                    : "Re-upload Video"}
+                </button>
+                <button
+                  onClick={() => {
+                    onReject(langCode, true, false, rejectReason);
+                    setShowRejectForm(false);
+                    setRejectReason("");
+                  }}
+                  disabled={
+                    !rejectReason || actionLoading === `reject-${langCode}`
+                  }
+                  className="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+                >
+                  Re-upload Photo
+                </button>
+                <button
+                  onClick={() => {
+                    onReject(langCode, true, false, rejectReason);
+                    setShowRejectForm(false);
+                    setRejectReason("");
+                  }}
+                  disabled={
+                    !rejectReason || actionLoading === `reject-${langCode}`
+                  }
+                  className="px-3 py-1 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+                >
+                  Re-upload Audio
                 </button>
                 <button
                   onClick={() => {

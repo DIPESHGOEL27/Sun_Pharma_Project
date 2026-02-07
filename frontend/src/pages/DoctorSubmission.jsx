@@ -307,6 +307,8 @@ export default function DoctorSubmission() {
   // Handle Logout
   const handleLogout = () => {
     sessionStorage.removeItem("mrSession");
+    sessionStorage.removeItem("submissionFormData");
+    sessionStorage.removeItem("submissionSelectedLanguages");
     setIsLoggedIn(false);
     setLoggedInMR(null);
     setFormData({
@@ -324,20 +326,28 @@ export default function DoctorSubmission() {
     toast.success("Logged out successfully");
   };
 
-  // Form data
-  const [formData, setFormData] = useState({
-    // MR Details
-    mrCode: "",
-    mrName: "",
-    mrPhone: "",
-    // Doctor Details
-    doctorName: "",
-    email: "",
-    phone: "",
-    specialty: "",
-    clinicName: "",
-    city: "",
-    state: "",
+  // Form data - restore from sessionStorage if available (for back-navigation auto-fill)
+  const [formData, setFormData] = useState(() => {
+    const saved = sessionStorage.getItem('submissionFormData');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) { /* ignore */ }
+    }
+    return {
+      // MR Details
+      mrCode: "",
+      mrName: "",
+      mrPhone: "",
+      // Doctor Details
+      doctorName: "",
+      email: "",
+      phone: "",
+      specialty: "",
+      clinicName: "",
+      city: "",
+      state: "",
+    };
   });
 
   // Files
@@ -354,13 +364,31 @@ export default function DoctorSubmission() {
   const [imageValidation, setImageValidation] = useState(null);
   const [audioValidations, setAudioValidations] = useState([]);
 
-  // Language selection
-  const [selectedLanguages, setSelectedLanguages] = useState([]);
+  // Language selection - restore from sessionStorage if available
+  const [selectedLanguages, setSelectedLanguages] = useState(() => {
+    const saved = sessionStorage.getItem('submissionSelectedLanguages');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) { /* ignore */ }
+    }
+    return [];
+  });
 
   // Errors
   const [errors, setErrors] = useState({});
 
   // MR details are now autofilled from login, no need for manual lookup
+
+  // Persist form data to sessionStorage whenever it changes (for back-navigation auto-fill)
+  useEffect(() => {
+    sessionStorage.setItem('submissionFormData', JSON.stringify(formData));
+  }, [formData]);
+
+  // Persist selected languages to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('submissionSelectedLanguages', JSON.stringify(selectedLanguages));
+  }, [selectedLanguages]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -668,6 +696,10 @@ export default function DoctorSubmission() {
 
       toast.dismiss("create-submission");
       toast.success("Submission created successfully!", { duration: 3000 });
+
+      // Clear saved form data on successful submission
+      sessionStorage.removeItem('submissionFormData');
+      sessionStorage.removeItem('submissionSelectedLanguages');
 
       // Redirect to consent verification
       navigate(`/consent/${res.data.submission_id}`);
@@ -1408,17 +1440,16 @@ export default function DoctorSubmission() {
                     <li>File size: Up to 10 MB</li>
                   </ul>
                 </div>
-                {/* Sample Doctor Photo */}
+                {/* Sample Doctor Photo - Inline Preview */}
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-800 mb-1">📸 Sample Doctor Photo</p>
-                  <a
-                    href="/samples/Sample_Doctor_Photo.jpeg"
-                    download="Sample_Doctor_Photo.jpeg"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    <PhotoIcon className="w-3.5 h-3.5" />
-                    Download Sample Photo
-                  </a>
+                  <p className="text-xs font-semibold text-gray-800 mb-2">
+                    📸 Sample Doctor Photo
+                  </p>
+                  <img
+                    src="/samples/Sample_Doctor_Photo.jpeg"
+                    alt="Sample Doctor Photo"
+                    className="w-full rounded-md border border-blue-200 shadow-sm"
+                  />
                 </div>
               </div>
             </div>
@@ -1451,17 +1482,15 @@ export default function DoctorSubmission() {
                     <li>Quality: 44.1 kHz or above</li>
                   </ul>
                 </div>
-                {/* Sample Audio File */}
+                {/* Sample Audio File - Inline Player */}
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-800 mb-1">🎙️ Sample Audio Recording</p>
-                  <a
-                    href="/samples/Sample_Audio.wav"
-                    download="Sample_Audio.wav"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    <MicrophoneIcon className="w-3.5 h-3.5" />
-                    Download Sample Audio
-                  </a>
+                  <p className="text-xs font-semibold text-gray-800 mb-2">
+                    🎙️ Sample Audio Recording
+                  </p>
+                  <audio controls className="w-full" preload="none">
+                    <source src="/samples/Sample_Audio.wav" type="audio/wav" />
+                    Your browser does not support the audio element.
+                  </audio>
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5 mb-1.5">
